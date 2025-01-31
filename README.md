@@ -1,2 +1,9 @@
 # VAL_GUI
-launch the server first and run the react app
+launch the server in one terminal: 
+```sh
+python server.py
+```
+then run react in another terminal:
+```sh
+npm run dev
+```
