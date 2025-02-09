@@ -1,0 +1,17 @@
+[
+    {
+        "group": 1,
+        "tasks": [
+            { "id": "1", "label": "get onion, broth", "parent": "onion soup base" },
+            { "id": "2", "label": "boil soup base", "parent": "onion soup base" }
+        ]
+    },
+    {
+        "group": 2,
+        "tasks": [
+            { "id": "1", "label": "get onion", "parent": "onion soup base" },
+            { "id": "2", "label": "get broth", "parent": "onion soup base" },
+            { "id": "3", "label": "onion soup", "parent": "onion soup base" }
+        ]
+    }
+]
