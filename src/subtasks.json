@@ -1,10 +1,17 @@
-[
-    {
-        "group": 1,
-        "tasks": [
-            { "id": "1", "label": "get onion", "parent": "onion soup base" },
-            { "id": "2", "label": "get broth", "parent": "onion soup base" },
-            { "id": "3", "label": "onion soup", "parent": "onion soup base" }
-        ]
-    }
-]
+{
+    "head": {
+        "name": "get",
+        "V": "onion"
+    },
+    "preconditions": {
+        "Fact": ""
+    },
+    "subtasks": [
+        {
+            "Task": "go to onion"
+        },
+        {
+            "Task": "interact"
+        }
+    ]
+}
