@@ -32,5 +32,5 @@ def handle_message(data):
     
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host="localhost", port=4001)
+    socketio.run(app, debug=True, host="localhost", port=4002)
 

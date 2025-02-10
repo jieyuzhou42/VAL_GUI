@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import RequestUserTask from './requestUserTask';
+import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
 
-const socket = io('http://localhost:4001'); // Replace with your server address
+const socket = io('http://localhost:4002'); // Replace with your server address
 
 function App () {
   const [message, setMessage] = useState(null);
@@ -24,7 +25,7 @@ function App () {
         case 'request_user_task':
           return <RequestUserTask data={message}/>;
         case 'confirm_best_match_decomposition':
-          return <h1>Default</h1>;
+          return <ConfirmBestMatchDecomposition data={message}/>;
       }
     }
     return null;

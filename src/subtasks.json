@@ -1,0 +1,17 @@
+{
+    "head": {
+        "name": "get",
+        "V": "onion"
+    },
+    "preconditions": {
+        "Fact": ""
+    },
+    "subtasks": [
+        {
+            "Task": "go to onion"
+        },
+        {
+            "Task": "interact"
+        }
+    ]
+}
