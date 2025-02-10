@@ -10,24 +10,33 @@ import '@xyflow/react/dist/style.css';
 
 const socket = io("http://localhost:4002");
 
-function Request_user_task() {
-    const [message, setMessage] = useState(null);
+function ConfirmBestMatchDecomposition({data}) {
+    const [message, setMessage] = useState("");
     const [input, setInput] = useState("");
 
     useEffect(() => {
-        socket.on("message", (data) => {
-            console.log("Received from server:", data);
-            if (data && data.type === 'confirm_best_match_decomposition') {
-                setMessage(data);
-            } else {
-                console.warn("Unexpected message type or empty data:", data);
-            }
-        });
+        if (data && data.type === 'confirm_best_match_decomposition') {
+          setMessage(data);
+          console.log("Message set:", data);
+        }
+      }, [data]);
 
-        return () => {
-            socket.off("message");
-        };
-    }, []);
+    // useEffect(() => {
+    //     socket.on("message", (data) => {
+    //         console.log("Received from server:", data);
+    //         if (data && data.type === 'confirm_best_match_decomposition') {
+    //             setMessage(data);
+    //             console.log("Message set:", message);
+    //             console.log(data);
+    //         } else {
+    //             console.warn("Unexpected message type or empty data:", data);
+    //         }
+    //     });
+
+    //     return () => {
+    //         socket.off("message");
+    //     };
+    // }, []);
 
     const sendMessage = () => {
         socket.emit("message", { message: input });
@@ -136,4 +145,4 @@ function Request_user_task() {
     );
 }
 
-export default Request_user_task;
+export default ConfirmBestMatchDecomposition;
