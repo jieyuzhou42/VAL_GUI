@@ -21,23 +21,6 @@ function ConfirmBestMatchDecomposition({data}) {
         }
       }, [data]);
 
-    // useEffect(() => {
-    //     socket.on("message", (data) => {
-    //         console.log("Received from server:", data);
-    //         if (data && data.type === 'confirm_best_match_decomposition') {
-    //             setMessage(data);
-    //             console.log("Message set:", message);
-    //             console.log(data);
-    //         } else {
-    //             console.warn("Unexpected message type or empty data:", data);
-    //         }
-    //     });
-
-    //     return () => {
-    //         socket.off("message");
-    //     };
-    // }, []);
-
     const sendMessage = () => {
         socket.emit("message", { message: input });
         setInput("");
