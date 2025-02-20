@@ -1,131 +1,81 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { io } from "socket.io-client";
+import React, { useState, useEffect } from "react";
+import io from "socket.io-client";
 import {
   ReactFlow,
-  addEdge,
   useNodesState,
-  useEdgesState,
+  useEdgesState
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import Display from "./Display";
 
 const socket = io("http://localhost:4002");
 
-function ConfirmBestMatchDecomposition({data}) {
-    const [message, setMessage] = useState("");
-    const [input, setInput] = useState("");
+function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes, setEdges }) {
+  console.log("nodes in ConfirmDecomp:", nodes);
 
-    useEffect(() => {
-        if (data && data.type === 'confirm_best_match_decomposition') {
-          setMessage(data);
-          console.log("Message set:", data);
-        }
-      }, [data]);
+  useEffect(() => {
+    // **If node is empty, create the parent node
+    let parentNode = nodes.find(n => n.data.label.includes(data.head.name));
+    if (!parentNode) {
+      console.log("No parent node found. Creating parent node.");
+      parentNode = {
+        id: "1",
+        position: { x: 0, y: 0 },
+        data: { label: `${data.head.name} ${data.head.V}` },
+        style: { color: 'black' },
+      };
+      setNodes(prev => [...prev, parentNode]);
+    }
 
-    const sendMessage = () => {
-        socket.emit("message", { message: input });
-        setInput("");
-    };
+    console.log(" Creating child node.", nodes);
+    const newNodes = [];
+    const newEdges = [];
+    let nodeId = nodes.length + 2; // maybe need to revised to hash value
 
-    const createNodesAndEdges = (message) => {
-        console.log("Processing message:", message); 
-        
-        const initialNodes = [];
-        const initialEdges = [];
+    data.subtasks.forEach((task, subIndex) => {
+      const taskNode = {
+        id: `${nodeId}`,
+        position: { 
+          x: parentNode.position.x + 200, 
+          y: parentNode.position.y + subIndex * 100 
+        },
+        data: { label: task.Task },
+        style: { color: 'black' },
+      };
 
-        if (message && message.text) {
-            const { head, subtasks } = message.text;
+      newNodes.push(taskNode);
+      newEdges.push({
+        id: `e-${parentNode.id}-${nodeId}`,
+        source: parentNode.id,
+        target: `${nodeId}`,
+      });
 
-            const parentNode = {
-                id: '1',
-                position: { x: 0, y: 0 },
-                data: { label: `${head.name} ${head.V}` },
-                style: { color: 'black' },
-            };
+      nodeId++;
+    });
 
-            initialNodes.push(parentNode);
+  setNodes(prev => [...prev, ...newNodes]);
+  setEdges(prev => [...prev, ...newEdges]);
+  }, [data]);
 
-            const buttonNode = {
-                id: '2',
-                position: { x: 200, y: 0 },
-                data: { label: 'V', onClick: () => console.log('yes') },
-                style: { color: 'black', cursor: 'pointer' },
-            };
 
-            initialNodes.push(buttonNode);
-            initialEdges.push({
-                id: 'e1-2',
-                source: '1',
-                target: '2',
-            });
+//click yes button
+  const handleConfirm = (data) => {
+    socket.emit("message", { type: "confirm_response", response: "yes" });
+    onConfirm();
+};
 
-            let maxYPosition = 0;
+  const handleReject = () => {
+      socket.emit("message", { type: "confirm_response", response: "no" });
+      console.log("User rejected decomposition");
+      onConfirm(null);
+  };
 
-            subtasks.forEach((task, index) => {
-                const taskNode = {
-                    id: `${index + 3}`,
-                    position: { x: 400, y: index * 100 },
-                    data: { label: task.Task },
-                    style: { color: 'black' },
-                };
-
-                initialNodes.push(taskNode);
-                initialEdges.push({
-                    id: `e2-${index + 3}`,
-                    source: '2',
-                    target: `${index + 3}`,
-                });
-
-                maxYPosition = Math.max(maxYPosition, taskNode.position.y);
-            });
-
-            const moreOptionsNode = {
-                id: `${initialNodes.length + 1}`,
-                position: { x: 400, y: maxYPosition + 100 },
-                data: { label: 'More options', onClick: () => console.log('no') },
-                style: { color: 'black', cursor: 'pointer' },
-            };
-
-            initialNodes.push(moreOptionsNode);
-        }
-
-        return { initialNodes, initialEdges };
-    };
-
-    useEffect(() => {
-        console.log("Messages state updated:", message); 
-        if (message) {
-            const { initialNodes, initialEdges } = createNodesAndEdges(message);
-            setNodes(initialNodes);
-            setEdges(initialEdges);
-        }
-    }, [message]);
-
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-
-    const onConnect = useCallback(
-        (connection) => setEdges((oldEdges) => addEdge(connection, oldEdges)),
-        [setEdges],
-    );
-
-    const onNodeClick = (event, node) => {
-        if (node.data.onClick) {
-            node.data.onClick();
-        }
-    };
-
-    return (
-        <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onNodeClick={onNodeClick}
-            />
-        </div>
-    );
+  return (
+    <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)' }}>
+        <button onClick={() => handleConfirm(data)} style={{ marginRight: 10 }}>✔ Yes</button>
+        <button onClick={handleReject}>❌ No</button>
+    </div>
+  );
 }
 
 export default ConfirmBestMatchDecomposition;

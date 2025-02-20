@@ -7,6 +7,8 @@ function RequestUserTask ({ data }){
   const [input, setInput] = useState("");
 
   const sendMessage = () => {
+    //clear the local
+    localStorage.clear();
     socket.emit('message', {'response': input});
     setInput("");
   };
@@ -14,7 +16,7 @@ function RequestUserTask ({ data }){
   return (
     <div style={{ padding: "20px" }}>
       <h2>VAL</h2>
-      <p>{data.text}</p>
+      <p>{data}</p>
       <div>
         <input 
           type="text" 
