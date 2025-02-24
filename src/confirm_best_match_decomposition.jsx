@@ -108,13 +108,6 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
       console.log("User rejected decomposition");
       onConfirm(null);
   };
-
-  return (
-    <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)' }}>
-        <button onClick={() => handleConfirm(data)} style={{ marginRight: 10 }}>✔ Yes</button>
-        <button onClick={handleReject}>❌ No</button>
-    </div>
-  );
 }
 
 export default ConfirmBestMatchDecomposition;
