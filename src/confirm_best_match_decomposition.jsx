@@ -1,18 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import io from "socket.io-client";
-import {
-  ReactFlow,
-  useNodesState,
-  useEdgesState
-} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import Display from "./Display";
-// import ButtonEdge from './ButtonEdge';
 
 const socket = io("http://localhost:4002");
 
 function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes, setEdges }) {
   console.log("nodes in ConfirmDecomp:", nodes);
+  console.log("edges in ConfirmDecomp:", edges);
 
   useEffect(() => {
     // **If node is empty, create the parent node
@@ -30,27 +24,29 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
       setNodes(prev => [...prev, parentNode]);
     }
 
-    // // Add yes node
-    // const yesNodeId = nodes.length + 2;
-    // const yesNode = {
-    //   id: `${yesNodeId}`,
-    //   position: { x: 200, y: 0 },
-    //   data: { label: "V", onClick: () => handleConfirm(data) },
-    //   style: { color: 'black', cursor: 'pointer' },
-    // }
+    // Add yes node
+    const yesNode = {
+      id: 'yesNode',
+      position: { x: parentNode.position.x + 200, y: parentNode.position.y },
+      data: { label: "V", onClick: () => handleConfirm(data) },
+      style: { color: 'black', cursor: 'pointer' },
+      sourcePosition: 'right',
+      targetPosition: 'left',
+    }
 
-    // setNodes(prev => [...prev, yesNode]);
-    // setEdges(prev => [...prev, {
-    //   id: `e-${parentNode.id}-${yesNode.id}`,
-    //   source: parentNode.id,
-    //   target: yesNode.id,
-    // }]);
+    setNodes(prev => [...prev, yesNode]);
+    setEdges(prev => [...prev, {
+      id: `e-${parentNode.id}-${yesNode.id}`,
+      source: parentNode.id,
+      target: yesNode.id,
+      label: `e-${parentNode.id}-${yesNode.id}`,
+    }]);
 
     // Add no node
     const noNodeId = nodes.length + 3;
     const noNode = {
-      id: `${noNodeId}`,
-      position: { x: 200, y: 400 },
+      id: 'noNode',
+      position: { x: parentNode.position.x + 400, y: parentNode.position.y + data.subtasks.length * 100 },
       data: { label: "More Options", onClick: handleReject },
       style: { color: 'black', cursor: 'pointer' },
     }
@@ -60,14 +56,14 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
     console.log(" Creating child node.", nodes);
     const newNodes = [];
     const newEdges = [];
-    let nodeId = nodes.length + 4; // maybe need to revised to hash value
+    let nodeId = nodes.length + 2; // maybe need to revised to hash value
 
     data.subtasks.forEach((task, subIndex) => {
       const taskNode = {
         id: `${nodeId}`,
         position: { 
-          x: parentNode.position.x + 200, 
-          y: parentNode.position.y + subIndex * 100 
+          x: yesNode.position.x + 200, 
+          y: yesNode.position.y + subIndex * 100 
         },
         data: { label: task.Task },
         style: { color: 'black' },
@@ -78,8 +74,9 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
       newNodes.push(taskNode);
       newEdges.push({
         id: `e-${parentNode.id}-${nodeId}`,
-        source: parentNode.id,
+        source: yesNode.id,
         target: `${nodeId}`,
+        label: `e-${parentNode.id}-${nodeId}`,
       });
 
       nodeId++;
@@ -93,6 +90,16 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
 //click yes button
   const handleConfirm = (data) => {
     socket.emit("message", { type: "confirm_response", response: "yes" });
+
+    setNodes(prevNodes => prevNodes.filter(node => node.id !== 'yesNode' && node.id !== 'noNode'));
+    setEdges(prevEdges => prevEdges.filter(edge => edge.target !== 'yesNode').map(edge => {
+      if (edge.source === 'yesNode') {
+        const parentNodeId = edge.id.split('-')[1];
+        return { ...edge, source: parentNodeId }; // Assuming parentNode.id is '1'
+      }
+      return edge;
+    }));
+    
     onConfirm();
 };
 
