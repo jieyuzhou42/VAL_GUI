@@ -9,6 +9,11 @@ function Display({ nodes, edges, setNodes, setEdges }) {
         <ReactFlow 
             nodes={nodes}
             edges={edges}
+            onNodeClick={(event, node) => {
+                if (node.data.onClick) {
+                  node.data.onClick();
+                }
+              }}
             fitView
         />
         </div>

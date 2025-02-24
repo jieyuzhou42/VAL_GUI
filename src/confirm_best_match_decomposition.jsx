@@ -7,6 +7,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import Display from "./Display";
+// import ButtonEdge from './ButtonEdge';
 
 const socket = io("http://localhost:4002");
 
@@ -23,14 +24,43 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
         position: { x: 0, y: 0 },
         data: { label: `${data.head.name} ${data.head.V}` },
         style: { color: 'black' },
+        sourcePosition: 'right',
+        targetPosition: 'left',
       };
       setNodes(prev => [...prev, parentNode]);
     }
 
+    // // Add yes node
+    // const yesNodeId = nodes.length + 2;
+    // const yesNode = {
+    //   id: `${yesNodeId}`,
+    //   position: { x: 200, y: 0 },
+    //   data: { label: "V", onClick: () => handleConfirm(data) },
+    //   style: { color: 'black', cursor: 'pointer' },
+    // }
+
+    // setNodes(prev => [...prev, yesNode]);
+    // setEdges(prev => [...prev, {
+    //   id: `e-${parentNode.id}-${yesNode.id}`,
+    //   source: parentNode.id,
+    //   target: yesNode.id,
+    // }]);
+
+    // Add no node
+    const noNodeId = nodes.length + 3;
+    const noNode = {
+      id: `${noNodeId}`,
+      position: { x: 200, y: 400 },
+      data: { label: "More Options", onClick: handleReject },
+      style: { color: 'black', cursor: 'pointer' },
+    }
+
+    setNodes(prev => [...prev, noNode]);
+
     console.log(" Creating child node.", nodes);
     const newNodes = [];
     const newEdges = [];
-    let nodeId = nodes.length + 2; // maybe need to revised to hash value
+    let nodeId = nodes.length + 4; // maybe need to revised to hash value
 
     data.subtasks.forEach((task, subIndex) => {
       const taskNode = {
@@ -41,6 +71,8 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
         },
         data: { label: task.Task },
         style: { color: 'black' },
+        sourcePosition: 'right',
+        targetPosition: 'left',
       };
 
       newNodes.push(taskNode);
