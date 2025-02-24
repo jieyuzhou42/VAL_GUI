@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import io from "socket.io-client";
 import '@xyflow/react/dist/style.css';
 
@@ -9,7 +9,7 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
   console.log("edges in ConfirmDecomp:", edges);
 
   useEffect(() => {
-    // **If node is empty, create the parent node
+    // If node is empty, create the parent node
     let parentNode = nodes.find(n => n.data.label.includes(data.head.name));
     if (!parentNode) {
       console.log("No parent node found. Creating parent node.");
@@ -86,7 +86,6 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
   setEdges(prev => [...prev, ...newEdges]);
   }, [data]);
 
-
 //click yes button
   const handleConfirm = (data) => {
     socket.emit("message", { type: "confirm_response", response: "yes" });
@@ -95,7 +94,7 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
     setEdges(prevEdges => prevEdges.filter(edge => edge.target !== 'yesNode').map(edge => {
       if (edge.source === 'yesNode') {
         const parentNodeId = edge.id.split('-')[1];
-        return { ...edge, source: parentNodeId }; // Assuming parentNode.id is '1'
+        return { ...edge, source: parentNodeId }; 
       }
       return edge;
     }));
