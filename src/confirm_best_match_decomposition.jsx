@@ -10,11 +10,11 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
 
   useEffect(() => {
     // If node is empty, create the parent node
-    let parentNode = nodes.find(n => n.data.label.includes(data.head.name));
+    let parentNode = nodes.find(n => n.id.includes(data.head.hash));
     if (!parentNode) {
       console.log("No parent node found. Creating parent node.");
       parentNode = {
-        id: "1",
+        id: data.head.hash,
         position: { x: 0, y: 0 },
         data: { label: `${data.head.name} ${data.head.V}` },
         style: { color: 'black' },
@@ -56,11 +56,10 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
     console.log(" Creating child node.", nodes);
     const newNodes = [];
     const newEdges = [];
-    let nodeId = nodes.length + 2; // maybe need to revised to hash value
 
     data.subtasks.forEach((task, subIndex) => {
       const taskNode = {
-        id: `${nodeId}`,
+        id: task.hash,
         position: { 
           x: yesNode.position.x + 200, 
           y: yesNode.position.y + subIndex * 100 
@@ -73,13 +72,11 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
 
       newNodes.push(taskNode);
       newEdges.push({
-        id: `e-${parentNode.id}-${nodeId}`,
+        id: `e-${parentNode.id}-${taskNode.id}`,
         source: yesNode.id,
-        target: `${nodeId}`,
-        label: `e-${parentNode.id}-${nodeId}`,
+        target: `${taskNode.id}`,
+        label: `e-${parentNode.id}-${taskNode.id}`,
       });
-
-      nodeId++;
     });
 
   setNodes(prev => [...prev, ...newNodes]);
