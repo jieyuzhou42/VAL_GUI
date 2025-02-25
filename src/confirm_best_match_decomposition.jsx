@@ -6,11 +6,12 @@ const socket = io("http://localhost:4002");
 
 function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes, setEdges }) {
   console.log("nodes in ConfirmDecomp:", nodes);
-  console.log("edges in ConfirmDecomp:", edges);
 
   useEffect(() => {
     // If node is empty, create the parent node
     let parentNode = nodes.find(n => n.id.includes(data.head.hash));
+    let noNodeLabel = 'More Options';
+
     if (!parentNode) {
       console.log("No parent node found. Creating parent node.");
       parentNode = {
@@ -21,7 +22,22 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
         sourcePosition: 'right',
         targetPosition: 'left',
       };
+
       setNodes(prev => [...prev, parentNode]);
+    } else {
+      console.log("Parent node found.");
+      const parentNodeId = parentNode.id;
+
+      if (edges.some(edge => edge.source === parentNodeId)) {
+        noNodeLabel = '+ Create Method';
+      } else {
+        noNodeLabel = 'More Options';
+      }
+
+      setNodes(prevNodes => prevNodes.filter(node => {
+        return !edges.some(edge => edge.source === parentNodeId && edge.target === node.id);
+      }));
+      setEdges(prevEdges => prevEdges.filter(edge => edge.source !== parentNode.id));
     }
 
     // Add yes node
@@ -43,11 +59,10 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
     }]);
 
     // Add no node
-    const noNodeId = nodes.length + 3;
     const noNode = {
       id: 'noNode',
-      position: { x: parentNode.position.x + 400, y: parentNode.position.y + data.subtasks.length * 100 },
-      data: { label: "More Options", onClick: handleReject },
+      position: { x: parentNode.position.x + 400, y: parentNode.position.y + data.subtasks.length * (150 / (parentNode.position.x / 200 + 1)) },
+      data: { label: noNodeLabel, onClick: handleReject },
       style: { color: 'black', cursor: 'pointer' },
     }
 
@@ -62,7 +77,7 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
         id: task.hash,
         position: { 
           x: yesNode.position.x + 200, 
-          y: yesNode.position.y + subIndex * 100 
+          y: yesNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
         },
         data: { label: task.Task },
         style: { color: 'black' },
@@ -83,25 +98,31 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
   setEdges(prev => [...prev, ...newEdges]);
   }, [data]);
 
+const updateNodesAndEdges = () => {
+  setNodes(prevNodes => prevNodes.filter(node => node.id !== 'yesNode' && node.id !== 'noNode'));
+  setEdges(prevEdges => prevEdges.filter(edge => edge.target !== 'yesNode').map(edge => {
+    if (edge.source === 'yesNode') {
+      const parentNodeId = edge.id.split('-')[1];
+      return { ...edge, source: parentNodeId }; 
+    }
+    return edge;
+  }));
+}
+
 //click yes button
   const handleConfirm = (data) => {
     socket.emit("message", { type: "confirm_response", response: "yes" });
+    console.log("User confirmed decomposition");
 
-    setNodes(prevNodes => prevNodes.filter(node => node.id !== 'yesNode' && node.id !== 'noNode'));
-    setEdges(prevEdges => prevEdges.filter(edge => edge.target !== 'yesNode').map(edge => {
-      if (edge.source === 'yesNode') {
-        const parentNodeId = edge.id.split('-')[1];
-        return { ...edge, source: parentNodeId }; 
-      }
-      return edge;
-    }));
-    
+    updateNodesAndEdges();
     onConfirm();
 };
 
   const handleReject = () => {
       socket.emit("message", { type: "confirm_response", response: "no" });
       console.log("User rejected decomposition");
+
+      updateNodesAndEdges();
       onConfirm(null);
   };
 }
