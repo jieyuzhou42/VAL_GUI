@@ -25,7 +25,7 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
 
       setNodes(prev => [...prev, parentNode]);
     } else {
-      console.log("Parent node found.");
+      console.log("Parent node found:", parentNode);
       const parentNodeId = parentNode.id;
 
       if (edges.some(edge => edge.source === parentNodeId)) {
@@ -34,8 +34,14 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
         noNodeLabel = 'More Options';
       }
 
-      setNodes(prevNodes => prevNodes.filter(node => {
-        return !edges.some(edge => edge.source === parentNodeId && edge.target === node.id);
+      setNodes(prevNodes => prevNodes.map(node => {
+        if (node.position.x === (parentNode.position.x + 400)) {
+          return { ...node, hidden: true };
+        }
+        if (edges.some(edge => edge.source === parentNodeId && edge.target === node.id)) {
+          return node;
+        }
+        return node;
       }));
       setEdges(prevEdges => prevEdges.filter(edge => edge.source !== parentNode.id));
     }
