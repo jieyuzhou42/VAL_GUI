@@ -35,7 +35,7 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
       }
 
       setNodes(prevNodes => prevNodes.map(node => {
-        if (node.position.x === (parentNode.position.x + 400)) {
+        if (node.position.x >= (parentNode.position.x + 400)) {
           return { ...node, hidden: true };
         }
         if (edges.some(edge => edge.source === parentNodeId && edge.target === node.id)) {
