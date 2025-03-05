@@ -104,7 +104,9 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
   setEdges(prev => [...prev, ...newEdges]);
   }, [data]);
 
+// This function updates the nodes and edges when user confirms or rejects decomposition
 const updateNodesAndEdges = () => {
+  // removes the yes and no nodes
   setNodes(prevNodes => prevNodes.filter(node => node.id !== 'yesNode' && node.id !== 'noNode'));
   setEdges(prevEdges => prevEdges.filter(edge => edge.target !== 'yesNode').map(edge => {
     if (edge.source === 'yesNode') {
@@ -115,19 +117,19 @@ const updateNodesAndEdges = () => {
   }));
 }
 
-//click yes button
   const handleConfirm = (data) => {
     socket.emit("message", { type: "confirm_response", response: "yes" });
     console.log("User confirmed decomposition");
 
     updateNodesAndEdges();
     onConfirm();
+    // set message into null and VAL will emit new message to render
 };
 
   const handleReject = () => {
-      socket.emit("message", { type: "confirm_response", response: "no" });
+      socket.emit("message", { type: "confirm_response", response: "more options" });
       console.log("User rejected decomposition");
-
+      // TODO: need to be modified, remove the previously added nodes. 
       updateNodesAndEdges();
       onConfirm(null);
   };

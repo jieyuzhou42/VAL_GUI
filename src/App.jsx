@@ -5,12 +5,14 @@ import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
 import EditDecomposition from './EditDecomposition';
 import Display from './Display';
 
-const socket = io('http://localhost:4002'); // Replace with your server address
-
+const socket = io('http://localhost:4002'); 
 function App () {
   const [message, setMessage] = useState(null);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
+  // these are constants that pass through each components
+  // all components just make changes to these constants
+  // and display renders them
 
   useEffect(() => {
     socket.on('message', (data) => {
@@ -24,8 +26,7 @@ function App () {
   }, []);
 
   const handleConfirm = () => {
-
-    // hide confirm component
+    // This function hide confirm component
     setMessage(null);
   };
   console.log("nodes in app", nodes);
