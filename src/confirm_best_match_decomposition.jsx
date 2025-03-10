@@ -2,15 +2,14 @@ import { useEffect } from "react";
 import io from "socket.io-client";
 import '@xyflow/react/dist/style.css';
 
-const socket = io("http://localhost:4002");
 
-function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes, setEdges }) {
+function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot,
+        nodes, edges, setNodes, setEdges }) {
   console.log("nodes in ConfirmDecomp:", nodes);
 
   useEffect(() => {
     // If node is empty, create the parent node
     let parentNode = nodes.find(n => n.id.includes(data.head.hash));
-    let noNodeLabel = 'More Options';
 
     if (!parentNode) {
       console.log("No parent node found. Creating parent node.");
@@ -27,14 +26,16 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
     } else {
       console.log("Parent node found:", parentNode);
       const parentNodeId = parentNode.id;
-
-      if (edges.some(edge => edge.source === parentNodeId)) {
-        noNodeLabel = '+ Create Method';
-      } else {
-        noNodeLabel = 'More Options';
-      }
+      // need to be modified, current logic is first time there is no node and edge->more options
+      // but the real logic is when there is no other more options/ OR create method is always there
+      // if (edges.some(edge => edge.source === parentNodeId)) {
+      //   noNodeLabel = '+ Create Method';
+      // } else {
+      //   noNodeLabel = 'More Options';
+      // }
 
       setNodes(prevNodes => prevNodes.map(node => {
+        // hide the nodes
         if (node.position.x >= (parentNode.position.x + 400)) {
           return { ...node, hidden: true };
         }
@@ -50,7 +51,7 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
     const yesNode = {
       id: 'yesNode',
       position: { x: parentNode.position.x + 200, y: parentNode.position.y },
-      data: { label: "V", onClick: () => handleConfirm(data) },
+      data: {  label: "✔", onClick: () => handleConfirm(data) },
       style: { color: 'black', cursor: 'pointer' },
       sourcePosition: 'right',
       targetPosition: 'left',
@@ -68,11 +69,20 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
     const noNode = {
       id: 'noNode',
       position: { x: parentNode.position.x + 400, y: parentNode.position.y + data.subtasks.length * (150 / (parentNode.position.x / 200 + 1)) },
-      data: { label: noNodeLabel, onClick: handleReject },
+      data: { label: 'More Options', onClick: handleReject },
       style: { color: 'black', cursor: 'pointer' },
     }
 
     setNodes(prev => [...prev, noNode]);
+
+    const addMethodNode = {
+      id: 'add method',
+      position: { x: parentNode.position.x + 400, y: parentNode.position.y + data.subtasks.length * (150 / (parentNode.position.x / 200 + 1))+50 },
+      data: { label: '+ Create Method', onClick: handleAddMethod },
+      style: { color: 'black', cursor: 'pointer' },
+    }
+
+    setNodes(prev => [...prev, addMethodNode]);
 
     console.log(" Creating child node.", nodes);
     const newNodes = [];
@@ -106,8 +116,8 @@ function ConfirmBestMatchDecomposition({ data, onConfirm, nodes, edges, setNodes
 
 // This function updates the nodes and edges when user confirms or rejects decomposition
 const updateNodesAndEdges = () => {
-  // removes the yes and no nodes
-  setNodes(prevNodes => prevNodes.filter(node => node.id !== 'yesNode' && node.id !== 'noNode'));
+  // removes the yes,more options and add method nodes
+  setNodes(prevNodes => prevNodes.filter(node => node.id !== 'yesNode' && node.id !== 'noNode' && node.id !== 'add method'));
   setEdges(prevEdges => prevEdges.filter(edge => edge.target !== 'yesNode').map(edge => {
     if (edge.source === 'yesNode') {
       const parentNodeId = edge.id.split('-')[1];
@@ -116,6 +126,8 @@ const updateNodesAndEdges = () => {
     return edge;
   }));
 }
+
+// every confirmation step has confirm, more options, add method and edit as options
 
   const handleConfirm = (data) => {
     socket.emit("message", { type: "confirm_response", response: "yes" });
@@ -133,6 +145,14 @@ const updateNodesAndEdges = () => {
       updateNodesAndEdges();
       onConfirm(null);
   };
+
+  const handleAddMethod = () => {
+    socket.emit("message", { type: "confirm_response", response: "add method" });
+    setShowChatbot(true);
+    updateNodesAndEdges();
+    onConfirm(null);
+  };
+
 }
 
 export default ConfirmBestMatchDecomposition;

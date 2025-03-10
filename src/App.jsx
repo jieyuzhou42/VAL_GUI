@@ -4,10 +4,12 @@ import RequestUserTask from './requestUserTask';
 import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
 import EditDecomposition from './EditDecomposition';
 import Display from './Display';
+import Chatbot from './chatbot';
 
 const socket = io('http://localhost:4002'); 
 function App () {
   const [message, setMessage] = useState(null);
+  const [showChatbot, setShowChatbot] = useState(false);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   // these are constants that pass through each components
@@ -19,21 +21,27 @@ function App () {
       console.log('Received from server:', data);
       setMessage(data);
     });
-
     return () => {
       socket.off('message');
     };
   }, []);
 
+  //after user create a method hide the chat box automatically
+  useEffect(() => {
+    if (message && message.type === 'confirm_best_match_decomposition') {
+      setShowChatbot(false);
+    }
+  }, [message]);
+  
+  // This function hide confirm component
   const handleConfirm = () => {
-    // This function hide confirm component
     setMessage(null);
   };
   console.log("nodes in app", nodes);
 
 
   return (
-    <div>
+    <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
       {message?.type === 'request_user_task' ? (
         <RequestUserTask data={message.text} />
       ) : (
@@ -49,16 +57,31 @@ function App () {
             <ConfirmBestMatchDecomposition 
               data={message.text} 
               onConfirm={handleConfirm}
+              setShowChatbot={setShowChatbot}
               nodes={nodes}
               edges={edges}
               setNodes={setNodes}
               setEdges={setEdges}
+              socket={socket}
             />
           )}
           {message?.type === 'edit_decomposition' && <EditDecomposition data={message.text} />}
         </>
       )}
-    </div>
+
+      {showChatbot && (
+      <div
+        style={{
+          position: 'absolute',
+          top: 50,
+          right: 50,
+          zIndex: 9999, // ensures it's above the flow
+        }}
+      >
+        <Chatbot socket={socket} />
+      </div>
+    )}
+  </div>
   );
 }
 
