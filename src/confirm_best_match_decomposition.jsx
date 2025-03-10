@@ -41,6 +41,8 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
           if (node.id.includes('unhide')) {
             return { ...node, hidden: false };
           }
+          return { ...node, hidden: true };
+        }
         if (edges.some(edge => edge.source === parentNodeId && edge.target === node.id)) {
           return node;
         }
@@ -53,7 +55,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
     const yesNode = {
       id: `${data.head.hash}-unhide`,
       position: { x: parentNode.position.x + 200, y: parentNode.position.y },
-      data: {  label: "✔", onClick: () => handleConfirm(data) },
+      data: {  label: "V", onClick: () => handleConfirm(yesNode) },
       style: { color: 'black', cursor: 'pointer' },
       sourcePosition: 'right',
       targetPosition: 'left',
@@ -131,10 +133,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
 
 // every confirmation step has confirm, more options, add method and edit as options
 
-  const handleConfirm = (data) => {
-    socket.emit("message", { type: "confirm_response", response: "yes" });
-    console.log("User confirmed decomposition");
-
   const handleConfirm = (yesNode) => {
     if (yesNode.data.label === 'V'){
       socket.emit("message", { type: "confirm_response", response: "yes" });
@@ -204,6 +202,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
     onConfirm(null);
   };
 
-}
+ }
+
 
 export default ConfirmBestMatchDecomposition;
