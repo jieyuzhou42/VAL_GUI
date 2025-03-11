@@ -131,23 +131,27 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
     }));
   };
 
-// every confirmation step has confirm, more options, add method and edit as options
-
+  // every confirmation step has confirm, more options, add method and edit as options
   const handleConfirm = (yesNode) => {
-    if (yesNode.data.label === 'V'){
       socket.emit("message", { type: "confirm_response", response: "yes" });
       console.log("User confirmed decomposition");
       console.log('Yes node', yesNode);
-  
-      yesNode.hidden = true;
-      yesNode.data.label = '...';
-  
-      console.log('Updated yes node', yesNode);
-      
+
       setNodes(prevNodes => {
-        const updatedNodes = prevNodes.map(node => 
-            node.id === yesNode.id ? yesNode : node
-        );
+        const updatedNodes = prevNodes.map(node => {
+          if (node.id === yesNode.id) {
+            return {
+              ...node,
+              hidden: true,
+              data: {
+                ...node.data,
+                label: '...',
+                onClick: () => handleUnhide(yesNode)
+              }
+            };
+          }
+          return node;
+        });
         console.log('Nodes after update:', updatedNodes);
         return updatedNodes;
       });
@@ -155,36 +159,37 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       updateNodesAndEdges();
       onConfirm();
       // set message into null and VAL will emit new message to render
-    } else if (yesNode.data.label === '...') {
-      console.log("Unhide clicked");
-      
-      const hashValue = yesNode.id.split('-')[0];
-      console.log("Hash value", hashValue);
+  };
 
-      let edgesToUnhide = [];
+  const handleUnhide = (yesNode) => {
+    console.log("Unhide clicked");
+    
+    const hashValue = yesNode.id.split('-')[0];
+    console.log("Hash value", hashValue);
 
-      setEdges(prevEdges => {
-        console.log('All edges before unhide:', prevEdges);
-        edgesToUnhide = prevEdges.filter(edge => edge.source === hashValue);
-        console.log('Edges to unhide:', edgesToUnhide);
-        return prevEdges;
+    let edgesToUnhide = [];
+
+    setEdges(prevEdges => {
+      console.log('All edges before unhide:', prevEdges);
+      edgesToUnhide = prevEdges.filter(edge => edge.source === hashValue);
+      console.log('Edges to unhide:', edgesToUnhide);
+      return prevEdges;
+    });
+
+    setNodes(prevNodes => {
+      console.log('All nodes before unhide:', prevNodes);
+      const updatedNodes = prevNodes.map(node => {
+        if (edgesToUnhide.some(edge => edge.target === node.id)) {
+          return { ...node, hidden: false };
+        }
+        if (node.id === yesNode.id) {
+          return { ...node, hidden: true };
+        }
+        return node; 
       })
-
-      setNodes(prevNodes => {
-        console.log('All nodes before unhide:', prevNodes);
-        const updatedNodes = prevNodes.map(node => {
-          if (edgesToUnhide.some(edge => edge.target === node.id)) {
-            return { ...node, hidden: false };
-          }
-          if (node.id === yesNode.id) {
-            return { ...node, hidden: true };
-          }
-          return node; 
-        })
-        console.log('Nodes after unhide:', updatedNodes);
-        return updatedNodes;
-      });
-    }
+      console.log('Nodes after unhide:', updatedNodes);
+      return updatedNodes
+    });
   };
 
   const handleReject = () => {
