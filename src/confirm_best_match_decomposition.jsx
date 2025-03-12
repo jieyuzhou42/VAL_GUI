@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import io from "socket.io-client";
 import '@xyflow/react/dist/style.css';
 
+const current_color = 'rgb(205, 221, 249)';
 
 function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot,
         nodes, edges, setNodes, setEdges }) {
@@ -44,6 +45,32 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       setEdges(prevEdges => prevEdges.filter(edge => edge.source !== parentNode.id));
     }
 
+    setNodes(prevNodes => prevNodes.map(node => {
+      if (node.id === parentNode.id ||
+          edges.some(edge => edge.source === parentNode.id && edge.target === node.id) ||
+          edges.some(edge => edge.target === parentNode.id && edge.source === node.id)
+      ) {
+        console.log('Setting node to blue:', node);
+        return {
+          ...node,
+          style: {
+            ...node.style,
+            background: current_color,
+          }
+        };
+      } else if (!node.id.includes('unhide')) {
+        return {
+          ...node,
+          style: {
+            ...node.style,
+            background: 'white',
+          }
+        }
+      } else {
+        return node;
+      }
+    }));
+
     // Add yes node
     const yesNode = {
       id: `${data.head.hash}-unhide`,
@@ -65,12 +92,16 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       targetPosition: 'left',
     }
 
+    console.log('Current path:', `${data.head.hash}-unhide`);
+    // for the nodes with id data.head.hash, make the background color blue
+    
     setNodes(prev => [...prev, yesNode]);
     setEdges(prev => [...prev, {
       id: `e-${parentNode.id}-${yesNode.id}`,
       source: parentNode.id,
       target: yesNode.id,
-      // label: `e-${parentNode.id}-${yesNode.id}`,
+      // debugging
+      label: `e-${parentNode.id}-${yesNode.id}`,
     }]);
 
     // Add no node
@@ -104,7 +135,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
           y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
         },
         data: { label: task.Task },
-        style: { color: 'black' },
+        style: { color: 'black', background: current_color },
         sourcePosition: 'right',
         targetPosition: 'left',
       };
@@ -114,7 +145,8 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
         id: `e-${parentNode.id}-${taskNode.id}`,
         source: yesNode.id,
         target: `${taskNode.id}`,
-        // label: `e-${parentNode.id}-${taskNode.id}`,
+        // debugging
+        label: `e-${parentNode.id}-${taskNode.id}`,
       });
     });
 
