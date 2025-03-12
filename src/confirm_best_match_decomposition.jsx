@@ -103,7 +103,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       source: parentNode.id,
       target: yesNode.id,
       // debugging
-      label: `e-${parentNode.id}-${yesNode.id}`,
+      // label: `e-${parentNode.id}-${yesNode.id}`,
     }]);
 
     // Add no node
@@ -148,7 +148,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
         source: yesNode.id,
         target: `${taskNode.id}`,
         // debugging
-        label: `e-${parentNode.id}-unhide-${taskNode.id}`,
+        // label: `e-${parentNode.id}-unhide-${taskNode.id}`,
       });
     });
 
@@ -218,16 +218,21 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
   const handleUnhide = (yesNode) => {
     const hashValue = yesNode.id.split('-')[0];
     let edgesToUnhide = [];
+    let nodesToUnhide = [];
 
     setEdges(prevEdges => {
-      edgesToUnhide = prevEdges.filter(edge => edge.source === hashValue);
+      console.log('All edges before unhide:', prevEdges);
+      edgesToUnhide = prevEdges.filter(edge => edge.source === yesNode.id || edge.target === yesNode.id);
+      nodesToUnhide = edgesToUnhide.map(edge => edge.target);
+      console.log('Edges to unhide:', edgesToUnhide);
+      console.log('Nodes to unhide:', nodesToUnhide);
       return prevEdges;
     });
 
     setNodes(prevNodes => {
       console.log('All nodes before unhide:', prevNodes);
       const updatedNodes = prevNodes.map(node => {
-        if (edgesToUnhide.some(edge => edge.target === node.id)) {
+        if (nodesToUnhide.includes(node.id)) {
           return { ...node, hidden: false };
         }
         if (node.id === yesNode.id) {
@@ -278,27 +283,17 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       socket.emit("message", { type: "confirm_response", response: "more options" });
       console.log("User rejected decomposition");
 
-      // const hashValue = yesNode.id.split('-')[0];
       let edgesToRemove = [];
       let nodesToRemove = [];
 
       setEdges(prevEdges => {
-        console.log('All edges:', prevEdges);
-
         edgesToRemove = prevEdges.filter(edge => edge.source === yesNode.id);
         nodesToRemove = edgesToRemove.map(edge => edge.target);
         return prevEdges.filter(edge => edge.source !== yesNode.id);
       });
 
-      console.log('Edges to remove:', edgesToRemove);
-
       setNodes(prevNodes => {
-        console.log('All nodes:', prevNodes);
-        console.log('Nodes to remove:', nodesToRemove);
-
         const updatedNodes = prevNodes.filter(node => !nodesToRemove.includes(node.id));
-        console.log('Nodes after removal:', updatedNodes);
-
         return updatedNodes;
       });
 
