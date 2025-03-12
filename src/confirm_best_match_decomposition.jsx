@@ -27,13 +27,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
     } else {
       console.log("Parent node found:", parentNode);
       const parentNodeId = parentNode.id;
-      // need to be modified, current logic is first time there is no node and edge->more options
-      // but the real logic is when there is no other more options/ OR create method is always there
-      // if (edges.some(edge => edge.source === parentNodeId)) {
-      //   noNodeLabel = '+ Create Method';
-      // } else {
-      //   noNodeLabel = 'More Options';
-      // }
 
       setNodes(prevNodes => prevNodes.map(node => {
         // hide the nodes
@@ -54,9 +47,20 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
     // Add yes node
     const yesNode = {
       id: `${data.head.hash}-unhide`,
-      position: { x: parentNode.position.x + 200, y: parentNode.position.y },
-      data: {  label: "V", onClick: () => handleConfirm(yesNode) },
-      style: { color: 'black', cursor: 'pointer' },
+      // position: { x: parentNode.position.x + 250, y: parentNode.position.y },
+      position: { 
+        x: parentNode.position.x + 250, 
+        y: parentNode.position.y + 20 - 9 
+      },
+      data: { label: "✅", onClick: () => handleConfirm(yesNode) },
+      style: { 
+        color: 'black', 
+        cursor: 'pointer',
+        width: '18px',
+        height: '18px',
+        padding: '0px',
+        background: 'none',
+        border: 'none',},
       sourcePosition: 'right',
       targetPosition: 'left',
     }
@@ -66,7 +70,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       id: `e-${parentNode.id}-${yesNode.id}`,
       source: parentNode.id,
       target: yesNode.id,
-      label: `e-${parentNode.id}-${yesNode.id}`,
+      // label: `e-${parentNode.id}-${yesNode.id}`,
     }]);
 
     // Add no node
@@ -96,8 +100,8 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       const taskNode = {
         id: task.hash,
         position: { 
-          x: yesNode.position.x + 200, 
-          y: yesNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
+          x: yesNode.position.x + 150, 
+          y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
         },
         data: { label: task.Task },
         style: { color: 'black' },
@@ -110,7 +114,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
         id: `e-${parentNode.id}-${taskNode.id}`,
         source: yesNode.id,
         target: `${taskNode.id}`,
-        label: `e-${parentNode.id}-${taskNode.id}`,
+        // label: `e-${parentNode.id}-${taskNode.id}`,
       });
     });
 
@@ -121,7 +125,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
   // This function updates the nodes and edges when user confirms or rejects decomposition
   const updateNodesAndEdges = () => {
     // removes the yes and no nodes
-    setNodes(prevNodes => prevNodes.filter(node => node.id !== 'yesNode' && node.id !== 'noNode'));
+    setNodes(prevNodes => prevNodes.filter(node => node.id !== 'yesNode' && node.id !== 'noNode' && node.id !== 'add method'));
     setEdges(prevEdges => prevEdges.filter(edge => !edge.target.includes('unhide')).map(edge => {
       if (edge.source.includes('unhide')) {
         const parentNodeId = edge.id.split('-')[1];
@@ -135,7 +139,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
   const handleConfirm = (yesNode) => {
       socket.emit("message", { type: "confirm_response", response: "yes" });
       console.log("User confirmed decomposition");
-      console.log('Yes node', yesNode);
 
       setNodes(prevNodes => {
         const updatedNodes = prevNodes.map(node => {
@@ -145,14 +148,13 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
               hidden: true,
               data: {
                 ...node.data,
-                label: '...',
+                label: '···',
                 onClick: () => handleUnhide(yesNode)
               }
             };
           }
           return node;
         });
-        console.log('Nodes after update:', updatedNodes);
         return updatedNodes;
       });
   
