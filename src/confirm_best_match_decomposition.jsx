@@ -97,7 +97,15 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
     
     if (!nodes.some(node => node.id === yesNode.id)) {
       setNodes(prev => [...prev, yesNode]);
+    } else {
+      setNodes(prev => prev.map(node => {
+        if (node.id === yesNode.id) {
+          return { ...node,  data: { label: "✅", onClick: () => handleConfirm(yesNode) }, };
+        }
+        return node;
+      }));
     }
+    
     setEdges(prev => [...prev, {
       id: `e-${parentNode.id}-${yesNode.id}`,
       source: parentNode.id,
