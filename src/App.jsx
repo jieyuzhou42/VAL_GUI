@@ -57,7 +57,6 @@ function App () {
             <ConfirmBestMatchDecomposition 
               data={message.text} 
               onConfirm={handleConfirm}
-              setShowChatbot={setShowChatbot}
               nodes={nodes}
               edges={edges}
               setNodes={setNodes}
@@ -65,6 +64,16 @@ function App () {
               socket={socket}
             />
           )}
+          {message?.type === 'display_added_method' && (
+            <DisplayAddedMethod
+              data={message.text} 
+              nodes={nodes}
+              edges={edges}
+              setNodes={setNodes}
+              setEdges={setEdges}
+            />
+          )}
+          {message?.type === 'ask_subtasks' && ( setShowChatbot(true) )}
           {message?.type === 'edit_decomposition' && <EditDecomposition data={message.text} />}
         </>
       )}

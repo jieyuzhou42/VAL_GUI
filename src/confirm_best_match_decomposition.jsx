@@ -4,7 +4,7 @@ import '@xyflow/react/dist/style.css';
 
 const current_color = 'rgb(205, 221, 249)';
 
-function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot,
+function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
         nodes, edges, setNodes, setEdges }) {
   console.log("nodes in ConfirmDecomp:", nodes);
   console.log('edges in ConfirmDecomp:', edges);
@@ -311,8 +311,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
 
   const handleAddMethod = () => {
     socket.emit("message", { type: "confirm_response", response: "add method" });
-    setShowChatbot(true);
-    updateNodesAndEdges();
     onConfirm(null);
   };
  }
