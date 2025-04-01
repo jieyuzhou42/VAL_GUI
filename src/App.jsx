@@ -5,6 +5,7 @@ import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
 import EditDecomposition from './EditDecomposition';
 import Display from './Display';
 import Chatbot from './chatbot';
+import './App.css';
 
 const socket = io('http://localhost:4002'); 
 function App () {
@@ -41,7 +42,7 @@ function App () {
 
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
+    <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh' }}>
       {message?.type === 'request_user_task' ? (
         <RequestUserTask data={message.text} />
       ) : (
