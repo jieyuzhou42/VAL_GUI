@@ -40,3 +40,19 @@
 .read-the-docs {
   color: #888;
 }
+
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
+
+body {
+  background-color: rgb(246, 246, 246);
+  font-family: 'Lato', sans-serif;
+  font-weight: 600;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.react-flow__handle {
+  opacity: 0; /* Makes the handles invisible */
+  pointer-events: none; /* Prevents interaction with the handles */
+}
