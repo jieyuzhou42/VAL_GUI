@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import '@xyflow/react/dist/style.css';
 import { MarkerType } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
 
 const currentNodeColor = 'rgb(205, 221, 249)';
 const currentEdgeColor = 'rgb(132, 171, 249)';
