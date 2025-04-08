@@ -133,7 +133,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       // position: { x: parentNode.position.x + 250, y: parentNode.position.y },
       position: { 
         x: parentNode.position.x + 250, 
-        y: parentNode.position.y + 20 - 9 
+        y: parentNode.position.y + 20 - 10 
       },
       data: { 
         label: yesNodeLabel, 
@@ -224,9 +224,9 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
           x: yesNode.position.x + 150, 
           y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
         },
-        // data: { label: task.Task },
+        data: { label: task.Task },
         // debugging
-        data: {label: `${task.hash}-${task.Task}`},
+        // data: {label: `${task.hash}-${task.Task}`},
         _style: {
           background: currentNodeColor,
           border: 'none',
@@ -336,21 +336,21 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       });
   
       updateNodesAndEdges();
+      // handleConfirm(yesNode);
       onConfirm();
       // set message into null and VAL will emit new message to render
   };
 
   const handleUnhide = (yesNode) => {
+    console.log("unhide clicked");
+
     let edgesToUnhide = [];
     let nodesToUnhide = [];
     const parentNodeId = yesNode.id.split('-')[0];
 
     setEdges(prevEdges => {
-      console.log('All edges before unhide:', prevEdges);
       edgesToUnhide = prevEdges.filter(edge => edge.source === yesNode.id || edge.target === yesNode.id);
       nodesToUnhide = edgesToUnhide.map(edge => edge.target);
-      console.log('Edges to unhide:', edgesToUnhide);
-      console.log('Nodes to unhide:', nodesToUnhide);
 
       const updatedEdges = prevEdges.map(edge => {
         if (edgesToUnhide.includes(edge)) {
@@ -360,38 +360,32 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
         }
         return edge;
       });
-
-      console.log('Edges after unhide:', updatedEdges);
-
       return updatedEdges;
     });
 
     setNodes(prevNodes => {
-      console.log('All nodes before unhide:', prevNodes);
-      console.log('Yes node:', yesNode);
-
       const updatedNodes = prevNodes.map(node => {
-        if (nodesToUnhide.includes(node.id)) {
-          return { ...node, hidden: false };
-        } else if (node.id === yesNode.id) {
-          console.log('Setting node to unhide:', node);
-
-          return { 
-            ...node, 
+        if (node.id === yesNode.id) {
+          console.log('Setting yes node to unhide:', node);
+          return {
+            ...node,
             style: {
               ...node.style,
               background: nextNodeColor,
               border: 'none',
-            }, 
+            },
             data: {
               ...node.data,
               onClick: () => handleHide(yesNode),
             }
           };
-        }
-        return node; 
-      })
-      console.log('Nodes after unhide:', updatedNodes);
+        } else if (nodesToUnhide.includes(node.id)) {
+          console.log('Setting node to unhide:', node);
+          return { ...node, hidden: false };
+        } 
+        return node;
+      });
+
       return updatedNodes
     });
   };
@@ -399,6 +393,25 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
   const handleHide = (yesNode) => {
     console.log("hide clicked");
 
+    let edgesToHide = [];
+    let nodesToHide = [];
+
+    // Hide the edges that are connected to the yes node
+    setEdges(prevEdges => {
+      edgesToHide = prevEdges.filter(edge => edge.source === yesNode.id || edge.target === yesNode.id);
+      nodesToHide = edgesToHide.map(edge => edge.target);
+
+      return prevEdges.map(edge => {
+        if (edgesToHide.includes(edge)) {
+          return { ...edge, hidden: true };
+        }
+        return edge;
+      }
+      );
+    }
+    );
+
+    // Hide the nodes that are connected to the yes node
     setNodes(prevNodes => {
       const updatedNodes = prevNodes.map(node => {
         if (node.id === yesNode.id) {
@@ -406,7 +419,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
             ...node,
             style: {
               ...node.style,
-              background: 'white',
+              background: 'none',
               border: 'none',
             },
             data: {
@@ -414,6 +427,8 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
               onClick: () => handleUnhide(yesNode),
             }
           };
+        } else if (nodesToHide.includes(node.id)) {
+          return { ...node, hidden: true };
         }
         return node;
       });
