@@ -3,9 +3,10 @@ import '@xyflow/react/dist/style.css';
 import { MarkerType } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-const current_color = 'rgb(205, 221, 249)';
-const next_color = 'rgb(222, 222, 222)';
-const more_color = 'rgb(236, 243 ,254)'
+const currentNodeColor = 'rgb(205, 221, 249)';
+const currentEdgeColor = 'rgb(132, 171, 249)';
+const nextNodeColor = 'rgb(222, 222, 222)';
+const moreNodeColor = 'rgb(236, 243 ,254)'
 const yesNodeLabel = (<img src='src/assets/check-circle.svg' alt='yes' style={{ width: '16px', height: '16px' }} />);
 
 function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot,
@@ -25,7 +26,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
         data: { label: `${data.head.name} ${data.head.V}` },
         style: { 
           border: 'none',
-          background: current_color,
+          background: currentNodeColor,
         },
         sourcePosition: 'right',
         targetPosition: 'left',
@@ -54,6 +55,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       setEdges(prevEdges => prevEdges.filter(edge => edge.source !== parentNode.id));
     }
 
+    // set the nodes color
     setNodes(prevNodes => prevNodes.map(node => {
       if (node.id === parentNode.id ||
           edges.some(edge => edge.source === parentNode.id && edge.target === node.id) ||
@@ -64,7 +66,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
           ...node,
           style: {
             ...node.style,
-            background: current_color,
+            background: currentNodeColor,
             border: 'none',
           }
         };
@@ -74,11 +76,44 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
           ...node,
           style: {
             ...node.style,
-            background: next_color,
+            background: nextNodeColor,
           }
         }
       } else {
         return node;
+      }
+    }));
+
+    // set the edges color
+    setEdges(prevEdges => prevEdges.map(edge => {
+      if (edge.source === parentNode.id || edge.target === parentNode.id) {
+        return {
+          ...edge,
+          style: {
+            ...edge.style,
+            stroke: currentEdgeColor,
+            strokeWidth: 2,
+          },
+          markerEnd: {
+            type: MarkerType.Arrow,
+            strokeWidth: 2,
+            color: currentEdgeColor,
+          },
+        };
+      } else {
+        return {
+          ...edge,
+          style: {
+            ...edge.style,
+            stroke: nextNodeColor,
+            strokeWidth: 2,
+          },
+          markerEnd: {
+            type: MarkerType.Arrow,
+            strokeWidth: 2,
+            color: nextNodeColor,
+          },
+        };
       }
     }));
 
@@ -124,6 +159,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
     
     console.log('Parent node background:', parentNode.style?.background);
 
+    // Add edge from parent node to yes nodes
     setEdges(prev => [...prev, {
       id: `e-${parentNode.id}-${yesNode.id}`,
       source: parentNode.id,
@@ -131,11 +167,11 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       markerEnd: {
         type: MarkerType.Arrow,
         strokeWidth: 2,
-        color: parentNode.style?.background
+        color: currentEdgeColor
       },
       style: {
         strokeWidth: 2,
-        stroke: parentNode.style?.background
+        stroke: currentEdgeColor
       },
       // debugging
       // label: `e-${parentNode.id}-${yesNode.id}`,
@@ -147,7 +183,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       position: { x: parentNode.position.x + 400, y: parentNode.position.y + data.subtasks.length * (150 / (parentNode.position.x / 200 + 1)) },
       data: { label: 'More Options', onClick: () => handleReject(yesNode) },
       style: { 
-        background: more_color,
+        background: moreNodeColor,
         cursor: 'pointer', 
         border: 'none',
       },
@@ -160,7 +196,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
       position: { x: parentNode.position.x + 400, y: parentNode.position.y + data.subtasks.length * (150 / (parentNode.position.x / 200 + 1))+50 },
       data: { label: '+ Create Method', onClick: handleAddMethod },
       style: { 
-        background: more_color,
+        background: moreNodeColor,
         cursor: 'pointer', 
         border: 'none',
       },
@@ -183,7 +219,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
         // debugging
         data: {label: `${task.hash}-${task.Task}`},
         _style: {
-          background: current_color,
+          background: currentNodeColor,
           border: 'none',
         },
         get style() {
@@ -198,7 +234,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
 
       newNodes.push(taskNode);
 
-      console.log('taskNode background:', taskNode.style?.background);
+      console.log('taskNode background:', taskNode?.style?.background);
 
       newEdges.push({
         id: `e-${parentNode.id}-unhide-${taskNode.id}`,
@@ -207,11 +243,11 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
         markerEnd: {
           type: MarkerType.Arrow,
           strokeWidth: 2,
-          color: taskNode.style?.background,
+          color: currentEdgeColor,
         },
         style: {
           strokeWidth: 2,
-          stroke: taskNode.style?.background,
+          stroke: currentEdgeColor,
         },
         // debugging
         // label: `e-${parentNode.id}-unhide-${taskNode.id}`,
@@ -225,29 +261,53 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
   // This function updates the nodes and edges when user confirms or rejects decomposition
   const updateNodesAndEdges = () => {
     setNodes(prevNodes => prevNodes.filter(node => node.id !== 'noNode' && node.id !== 'add method'));
+
     setEdges(prevEdges => {
       const newEdges = [];
       const updatedEdges = prevEdges.map(edge => {
         if (edge.source.includes('unhide')) {
           const parentNodeId = edge.id.split('-')[1];
           const newEdgeId = `e-${parentNodeId}-${edge.target}`;
-          
+  
+          // Add new edge to the parent node
           if (!prevEdges.some(e => e.id === newEdgeId)) {
             newEdges.push({ 
               ...edge, 
               id: newEdgeId,
               source: parentNodeId,  
-              hidden: false 
+              hidden: false,
             });
           }
-          return { ...edge, hidden: true };
-        }
-        return edge;
-      });
 
+          // Hide the edges that are connected to the unhide node
+          return { ...edge, hidden: true };
+        } 
+        
+        // TODO: Update the color of the edges based on the target node background
+        const targetNode = nodes.find(node => node.id === edge.target);
+        const targetNodeBackground = targetNode?.style?.background;
+        
+        console.log('Edge:', edge);
+        console.log('Target node:', targetNode);
+        console.log('Target node background:', targetNodeBackground);
+
+        return {
+          ...edge,
+          // style: {
+          //   ...edge.style,
+          //   stroke: targetNodeBackground,
+          // },
+          // markerEnd: {
+          //   type: MarkerType.Arrow,
+          //   strokeWidth: 2,
+          //   color: targetNodeBackground,
+          // },
+        };
+      });
+  
       console.log('Updated edges:', updatedEdges);
       console.log('New edges:', newEdges);
-
+  
       return [...updatedEdges, ...newEdges];
     });
   };
@@ -262,7 +322,25 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
         if (edge.target === yesNode.id) {
           return { ...edge, hidden: true };
         }
-        return edge;
+
+        const targetNode = nodes.find(node => node.id === edge.target);
+        const targetNodeBackground = targetNode?.style?.background;
+        console.log('Target node background:', targetNodeBackground);
+
+        return {
+          ...edge,
+          // style: {
+          //   ...edge.style,
+          //   // stroke: targetNodeBackground,
+          //   stroke: 'red'
+          // },
+          // markerEnd: {
+          //   type: MarkerType.Arrow,
+          //   strokeWidth: 2,
+          //   // color: targetNodeBackground
+          //   color: 'red'
+          // },
+        };
       }))
 
       setNodes(prevNodes => {
@@ -330,7 +408,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm, setShowChatbot
             ...node, 
             style: {
               ...node.style,
-              background: next_color,
+              background: nextNodeColor,
               border: 'none',
             }, 
             data: {
