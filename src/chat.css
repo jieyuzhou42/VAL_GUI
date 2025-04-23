@@ -1,77 +1,64 @@
 :root {
-    /* --body-bg: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); */
     --msger-bg: #fff;
     --border: 2px solid #ddd;
     --left-msg-bg: #ececec;
     --right-msg-bg: #9AA9CC;
-}
-
-html {
-    box-sizing: border-box;
-}
-
-*, *:before, *:after {
-    margin: 0;
-    padding: 0;
-    box-sizing: inherit;
-}
-
-body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
+  }
+  
+  .chatbot-container {
     font-family: "Helvetica Neue", "Arial", sans-serif;
-    background: var(--body-bg);
-}
-
-/* set the chat box size */
-.msger {
+    font-weight: 450;
+    text-align: left;
+    font-size: 14px;
+  }
+  
+  /* Chat box layout */
+  .chatbot-container .msger {
     display: flex;
     flex-flow: column nowrap;
     justify-content: space-between;
-    max-width: 300px;
-    margin: 25px 10px;
-    height: 450px;
+    max-width: 380px;
+    margin: 20px 10px;
+    height: 550px;
     border: var(--border);
     border-radius: 5px;
     background: var(--msger-bg);
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
-}
-
-.msger-header {
+  }
+  
+  .chatbot-container .msger-header {
     display: flex;
     justify-content: space-between;
     padding: 10px;
     border-bottom: var(--border);
     background: #eee;
     color: #666;
-}
-
-.msger-chat {
+  }
+  
+  .chatbot-container .msger-chat {
     display: flex;
     flex-flow: column nowrap;
     padding: 10px;
     overflow-y: auto;
     flex: 1;
-}
-
-.msger-inputarea {
+  }
+  
+  .chatbot-container .msger-inputarea {
     display: flex;
     padding: 10px;
     border-top: var(--border);
     background: #eee;
-}
-
-.msger-input {
+  }
+  
+  .chatbot-container .msger-input {
     flex: 1;
     border: 2px solid #ddd;
     border-radius: 3px;
     padding: 10px;
     font-size: 14px;
-}
-
-.msger-send-btn {
+  }
+  
+  .chatbot-container .msger-send-btn {
     margin-left: 10px;
     padding: 10px 15px;
     border: none;
@@ -80,20 +67,20 @@ body {
     color: #fff;
     font-size: 14px;
     cursor: pointer;
-}
-
-.msg {
+  }
+  
+  /* Messages */
+  .chatbot-container .msg {
     display: flex;
     align-items: flex-end;
     margin-bottom: 10px;
-}
-
-.msg:last-of-type {
+  }
+  
+  .chatbot-container .msg:last-of-type {
     margin: 0;
-}
-
-/* set the image */
-.msg-img {
+  }
+  
+  .chatbot-container .msg-img {
     width: 40px;
     height: 40px;
     margin-right: 10px;
@@ -102,86 +89,89 @@ body {
     background-position: center;
     background-size: cover;
     border-radius: 50%;
-}
-
-.msg-bubble {
+  }
+  
+  .chatbot-container .msg-bubble {
     max-width: 200px;
     padding: 15px;
     border-radius: 15px;
     background: var(--left-msg-bg);
-}
-
-.msg-info {
+  }
+  
+  .chatbot-container .msg-info {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 5px;
-}
-
-.msg-info-name {
+  }
+  
+  .chatbot-container .msg-info-name {
     margin-right: 10px;
     font-weight: bold;
-}
-
-.msg-info-time {
+  }
+  
+  .chatbot-container .msg-info-time {
     font-size: 0.85em;
-}
-
-.left-msg .msg-bubble {
+  }
+  
+  .chatbot-container .left-msg .msg-bubble {
     border-bottom-left-radius: 0;
-}
-
-.right-msg {
+  }
+  
+  .chatbot-container .right-msg {
     flex-direction: row-reverse;
-}
-
-.right-msg .msg-bubble {
+  }
+  
+  .chatbot-container .right-msg .msg-bubble {
     background: var(--right-msg-bg);
     color: #fff;
     border-bottom-right-radius: 0;
-}
-
-.right-msg .msg-img {
+  }
+  
+  .chatbot-container .right-msg .msg-img {
     margin: 0 0 0 10px;
-}
-
-.user-input {
+  }
+  
+  /* User input style */
+  .chatbot-container .user-input {
     display: flex;
     justify-content: flex-end;
     margin-bottom: 10px;
-}
-
-.user-input .msg-bubble {
+  }
+  
+  .chatbot-container .user-input .msg-bubble {
     max-width: 60%;
     background-color: #dcf8c6;
     padding: 10px;
     border-radius: 10px;
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
     position: relative;
-}
-
-.user-input .msg-info {
+  }
+  
+  .chatbot-container .user-input .msg-info {
     display: flex;
     justify-content: flex-end;
     margin-bottom: 5px;
-}
-
-.user-input .msg-info-name {
+  }
+  
+  .chatbot-container .user-input .msg-info-name {
     font-weight: bold;
     color: #555;
-}
-
-.user-input .msg-text {
+  }
+  
+  .chatbot-container .user-input .msg-text {
     color: #333;
-}
-
-.val-output {
+    font-size: 8px;
+  }
+  
+  /* VAL output */
+  .chatbot-container .val-output {
     display: flex;
     justify-content: flex-start;
-    margin-bottom: 10px;
-}
-
-.val-output p {
+    margin-bottom: 0px;
+  }
+  
+  .chatbot-container .val-output p {
     max-width: 60%;
     background-color: #fff;
     padding: 10px;
@@ -189,29 +179,56 @@ body {
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
     position: relative;
     color: #333;
-}
-
-/* button style */
-.buttons {
+  }
+  
+  /* Buttons */
+  .chatbot-container .buttons {
     display: flex;
     justify-content: flex-start;
     gap: 10px;
     margin-top: 10px;
-}
-
-.buttons .yes,
-.buttons .no {
+  }
+  
+  .chatbot-container .buttons .yes,
+  .chatbot-container .buttons .no{
     padding: 5px 10px;
     border: none;
     border-radius: 5px;
     cursor: pointer;
     color: #fff;
-}
-
-.buttons .yes {
+  }
+  
+  .chatbot-container .buttons .yes{
     background-color: #F1CE42;
-}
-
-.buttons .no {
+  }
+  
+  .chatbot-container .buttons .no {
     background-color: #808080;
-}
+  }
+  
+  .chatbot-container .options-form {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-top: 12px;
+    border-radius: 12px;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+  }
+  
+  .chatbot-container .options-form select {
+    padding: 10px 12px;
+    border: 0.5px solid #ccc;
+    border-radius: 10px;
+    background-color: white;
+    font-size: 14px;
+    font-family: inherit;
+    appearance: none;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='2' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px 8px;
+    padding-right: 30px;
+  }

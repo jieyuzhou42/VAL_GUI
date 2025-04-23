@@ -33,6 +33,14 @@ function App () {
       setShowChatbot(false);
     }
   }, [message]);
+
+  // Show chatbot when ask_subtasks message is received
+useEffect(() => {
+  if (message?.type === 'ask_subtasks') {
+    setShowChatbot(true);
+  }
+}, [message]);
+
   
   // This function hide confirm component
   const handleConfirm = () => {
@@ -65,7 +73,7 @@ function App () {
               socket={socket}
             />
           )}
-          {message?.type === 'display_added_method' && (
+          {/* {message?.type === 'display_added_method' && (
             <DisplayAddedMethod
               data={message.text} 
               nodes={nodes}
@@ -73,8 +81,7 @@ function App () {
               setNodes={setNodes}
               setEdges={setEdges}
             />
-          )}
-          {message?.type === 'ask_subtasks' && ( setShowChatbot(true) )}
+          )} */}
           {message?.type === 'edit_decomposition' && <EditDecomposition data={message.text} />}
         </>
       )}
