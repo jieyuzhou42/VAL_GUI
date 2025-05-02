@@ -7,7 +7,7 @@ import Display from './Display';
 import Chatbot from './chatbot';
 import './App.css';
 
-const socket = io('http://localhost:4002'); 
+const socket = io(); 
 function App () {
   const [message, setMessage] = useState(null);
   const [showChatbot, setShowChatbot] = useState(false);
@@ -41,6 +41,18 @@ useEffect(() => {
   }
 }, [message]);
 
+useEffect(() => {
+  if (message?.type === 'segment_confirmation') {
+    setShowChatbot(true);
+  }
+}, [message]);
+
+useEffect(() => {
+  if (message?.type === 'request_user_task') {
+    setNodes([]);
+    setEdges([]);
+  }
+}, [message]);
   
   // This function hide confirm component
   const handleConfirm = () => {
@@ -95,7 +107,7 @@ useEffect(() => {
           zIndex: 9999, // ensures it's above the flow
         }}
       >
-        <Chatbot socket={socket} />
+        <Chatbot socket={socket} message={message}/>
       </div>
     )}
   </div>
