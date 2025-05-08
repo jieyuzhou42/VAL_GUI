@@ -21,7 +21,7 @@ function Chatbot({ socket, message }) {
         if (!userInput) return;
 
         if (socket) {
-          socket.emit('message', { response: userInput });
+          socket.emit('message', {type:"confirm_response", response: userInput });
         }
         appendMessage("Me", userPic, "right", userInput);
         msgerInput.value = "";
@@ -112,7 +112,7 @@ function Chatbot({ socket, message }) {
     yesButton.className = 'yes';
     yesButton.textContent = 'Yes';
     yesButton.onclick = () => {
-      socket.emit('message', { response: 'yes' });
+      socket.emit('message', {type:"confirm_response", response: 'yes' });
       appendMessage("Me", userPic, "right", 'yes');
     };
 
@@ -120,7 +120,7 @@ function Chatbot({ socket, message }) {
     noButton.className = 'no';
     noButton.textContent = 'No';
     noButton.onclick = () => {
-      socket.emit('message', { response: 'no' });
+      socket.emit('message', {type:"confirm_response", response: 'no' });
       appendMessage("Me", userPic, "right", 'no');
     };
 
@@ -160,7 +160,7 @@ function Chatbot({ socket, message }) {
     submitButton.textContent = 'Submit';
     submitButton.onclick = () => {
       const selectedOption = select.value;
-      socket.emit('message', { response: selectedOption });
+      socket.emit('message', {type:"confirm_response", response: selectedOption });
     };
 
     form.appendChild(submitButton);

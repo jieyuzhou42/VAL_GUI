@@ -5,6 +5,7 @@ import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
 import EditDecomposition from './EditDecomposition';
 import Display from './Display';
 import Chatbot from './chatbot';
+import DisplayAddedMethod from './DisplayAddedMethod';
 import './App.css';
 
 const socket = io(); 
@@ -85,15 +86,17 @@ useEffect(() => {
               socket={socket}
             />
           )}
-          {/* {message?.type === 'display_added_method' && (
+          {message?.type === 'display_added_method' && (
             <DisplayAddedMethod
-              data={message.text} 
-              nodes={nodes}
-              edges={edges}
-              setNodes={setNodes}
-              setEdges={setEdges}
+            data={message.text} 
+            onConfirm={handleConfirm}
+            nodes={nodes}
+            edges={edges}
+            setNodes={setNodes}
+            setEdges={setEdges}
+            socket={socket}
             />
-          )} */}
+          )}
           {message?.type === 'edit_decomposition' && <EditDecomposition data={message.text} />}
         </>
       )}

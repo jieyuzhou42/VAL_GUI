@@ -9,7 +9,7 @@ function RequestUserTask ({ data }){
   const sendMessage = () => {
     //clear the local
     localStorage.clear();
-    socket.emit('message', {'response': input});
+    socket.emit('message', {type:"confirm_response", response: input});
     setInput("");
   };
 

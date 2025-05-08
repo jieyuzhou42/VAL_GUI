@@ -1,25 +1,52 @@
-import { useEffect,useState } from "react";
+import { useEffect,useState,useRef } from "react";
 import '@xyflow/react/dist/style.css';
-import { MarkerType } from '@xyflow/react';
+import { MarkerType, SimpleBezierEdge } from '@xyflow/react';
+
 
 const currentNodeColor = 'rgb(205, 221, 249)';
 const currentEdgeColor = 'rgb(132, 171, 249)';
 const nextNodeColor = 'rgb(222, 222, 222)';
-const moreNodeColor = 'rgb(236, 243 ,254)'
-const yesNodeLabel = (<img src='src/assets/check-circle.svg' alt='yes' style={{ width: '16px', height: '16px' }} />);
+const moreNodeColor = 'rgb(236, 243 ,254)';
+
+//utility 
+function findAllAncestors(nodeId, edges) {
+  const ancestors = new Set();
+  const stack = [nodeId];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    for (const edge of edges) {
+      if (edge.target === current && !ancestors.has(edge.source)) {
+        ancestors.add(edge.source);
+        stack.push(edge.source);
+      }
+    }
+  }
+  return ancestors;
+}
 
 function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
         nodes, edges, setNodes, setEdges }) {
-  console.log("nodes in ConfirmDecomp:", nodes);
-  console.log('edges in ConfirmDecomp:', edges);
+  // console.log("nodes in ConfirmDecomp:", nodes);
+  // console.log('edges in ConfirmDecomp:', edges);
   const [showAllOptions, setShowAllOptions] = useState(false);
+  const edgesRef = useRef(edges);
+  const nodesRef = useRef([]);
+
+useEffect(() => {
+  edgesRef.current = edges;
+}, [edges]);
+
+useEffect(() => {
+  nodesRef.current = nodes;
+}, [nodes]);
+
 
   useEffect(() => {
     let parentNode = nodes.find(n => n.id.includes(data.head.hash));
 
     if (!parentNode) {
       // If node is empty, create the parent node
-      console.log("No parent node found. Creating parent node.");
+      // console.log("No parent node found. Creating parent node.");
       parentNode = {
         id: data.head.hash,
         position: { x: 0, y: 0 },
@@ -34,7 +61,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
 
       setNodes(prev => [...prev, parentNode]);
     } else {
-      console.log("Parent node found:", parentNode);
+      // console.log("Parent node found:", parentNode);
       const parentNodeId = parentNode.id;
 
       // hide the nodes that are not connected to the parent node
@@ -55,6 +82,12 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
       setEdges(prevEdges => prevEdges.filter(edge => edge.source !== parentNode.id));
     }
 
+    ///////set the nodes and edges color//////////
+
+    // utils: find the ancestor nodes, instead of just parent node
+    const ancestorIds = findAllAncestors(parentNode.id, edgesRef.current);
+    ancestorIds.add(parentNode.id);
+
     // set the nodes color
     setNodes(prevNodes => prevNodes.map(node => {
       if (node.id.includes('unhide')) {
@@ -67,10 +100,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
             border: 'none',
           }
         };
-      } else if (node.id === parentNode.id ||
-          edges.some(edge => edge.source === parentNode.id && edge.target === node.id) ||
-          edges.some(edge => edge.target === parentNode.id && edge.source === node.id) 
-      ) {
+      } else if (ancestorIds.has(node.id)) {
         // for the nodes with id data.head.hash, make the background color blue
         return {
           ...node,
@@ -96,7 +126,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
 
     // set the edges color
     setEdges(prevEdges => prevEdges.map(edge => {
-      if (edge.source === parentNode.id || edge.target === parentNode.id) {
+      if (ancestorIds.has(edge.source) && ancestorIds.has(edge.target)) {
         return {
           ...edge,
           style: {
@@ -127,29 +157,39 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
       }
     }));
 
+    // if there is no subtask just update the highlighted path and return
+    if (data.subtasks.length === 0) {
+      socket.emit("message", { type: 'response_decomposition', response:0 });
+      console.log("User confirmed decomposition with no subtask");
+      onConfirm(null);
+      return;
+    }
+
     // Add yes node
     const yesNode = {
       id: `${data.head.hash}-unhide-0`,
       // position: { x: parentNode.position.x + 250, y: parentNode.position.y },
       position: { 
-        x: parentNode.position.x + 250, 
-        y: parentNode.position.y + 10
+        x: parentNode.position.x + 200, 
+        y: parentNode.position.y + 3.5
       },
       data: { 
-        label: yesNodeLabel, 
+        label: "✓ Approve", 
         onClick: () => handleConfirm(yesNode,0,parentNode) 
       },
-      style: { 
-        width: '18px',
-        height: '18px',
-        padding: '0px',
-        background: 'none',
-        border: 'none',},
+      style: {
+        background: '#95B9F3', 
+        width: '70px',
+        height: '32px',
+        borderRadius: '16px',
+        border: 'none',
+        fontSize: '10px',
+        // fontWeight: '500',
+      },
       sourcePosition: 'right',
       targetPosition: 'left',
     }
 
-    console.log('Current path:', `${data.head.hash}-unhide`);
     
     if (!nodes.some(node => node.id === yesNode.id)) {
       setNodes(prev => [...prev, yesNode]);
@@ -158,7 +198,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
         if (node.id === yesNode.id) {
           return { ...node,  
             data: { 
-              label: yesNodeLabel,
+              label: "✓ Approve",
               onClick: () => handleConfirm(yesNode,0,parentNode) 
             }, 
           };
@@ -185,36 +225,32 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
       // label: `e-${parentNode.id}-${yesNode.id}`,
     }]);
 
-    // Add no node
-    const noNode = {
-      id: 'noNode',
-      position: { x: parentNode.position.x + 400, y: parentNode.position.y + data.subtasks.length * (150 / (parentNode.position.x / 200 + 1)) },
-      data: { label: 'More Options', onClick: () => handleReject(yesNode) },
-      style: { 
-        background: moreNodeColor,
-        cursor: 'pointer', 
-        border: 'none',
+    // Add × Reject
+    const rejectNode = {
+      id: 'reject',
+      position: {
+        x: yesNode.position.x,
+        y: yesNode.position.y + 40,
       },
-    }
-
-    setNodes(prev => [...prev, noNode]);
-
-    const addMethodNode = {
-      id: 'add method',
-      position: { 
-        x: parentNode.position.x + 400, 
-        y: parentNode.position.y + (data.subtasks[0].length-1) * (150 / (parentNode.position.x / 200 + 1))+50},
-      data: { label: '+ Create Method', onClick: handleAddMethod },
-      style: { 
-        background: moreNodeColor,
-        cursor: 'pointer', 
-        border: 'none',
+      data: {
+        label: '× Reject',
+        onClick: () => handleRejectClick(yesNode, parentNode, data),
       },
-    }
+      style: {
+        background: '#D9D9D9',
+        width: '70px',
+        height: '32px',
+        borderRadius: '16px',
+        border: 'none',
+        fontSize: '10px',
+        // fontWeight: '500',
+      },
+    };
 
-    setNodes(prev => [...prev, addMethodNode]);
+    setNodes(prev => [...prev, rejectNode]);
 
-    console.log(" Creating child node.", nodes);
+
+
     const newNodes = [];
     const newEdges = [];
 
@@ -245,7 +281,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
 
       newNodes.push(taskNode);
 
-      console.log('taskNode background:', taskNode?.style?.background);
 
       // Add edge from yes node to task node
       newEdges.push({
@@ -280,22 +315,23 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
     // render for subtasks 1..end
     data.subtasks.slice(1).forEach((option, idx) => {
       const realIndex = idx + 1;
-      const baseY = parentNode.position.y + 10;
+      const baseY = parentNode.position.y + 3.5;
       const yesNodeId = `${data.head.hash}-unhide-${realIndex}`;
       const yesNode = { id: yesNodeId, 
         position: { 
-          x: parentNode.position.x + 250, 
+          x: parentNode.position.x + 200, 
           y: baseY + idx * 100 }, 
         data: { 
-          label: yesNodeLabel, 
+          label: "✓ Approve", 
           onClick: () => handleConfirm(yesNode, realIndex,parentNode) 
         },
         style: { 
-          width: '18px', 
-          height: '18px', 
-          padding: '0px',
-          background: 'none', 
-          border: 'none' }, 
+          background: '#95B9F3', 
+          width: '70px',
+          height: '32px',
+          borderRadius: '16px',
+          border: 'none',
+          fontSize: '10px', }, 
         sourcePosition: 'right', 
         targetPosition: 'left' };
 
@@ -325,20 +361,32 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
           data: { label: task.Task }, 
           style: { background: currentNodeColor, border: 'none' },
           sourcePosition: 'right', targetPosition: 'left' };
+
         if (!nodes.some(n => n.id === taskId)) setNodes(prev => [...prev, taskNode]);
         setEdges(prev => prev.some(e => e.id === `e-${yesNodeId}-${taskId}`)
-          ? prev : [...prev, { id: `e-${yesNodeId}-${taskId}`, source: yesNodeId, target: taskId, markerEnd: { type: MarkerType.Arrow, strokeWidth: 2, color: currentEdgeColor }, style: { strokeWidth: 2, stroke: currentEdgeColor } }]
+          ? prev : [...prev, { id: `e-${yesNodeId}-${taskId}`, 
+            source: yesNodeId, 
+            target: taskId, 
+            markerEnd: { type: MarkerType.Arrow, strokeWidth: 2, color: currentEdgeColor }, 
+            style: { strokeWidth: 2, stroke: currentEdgeColor } }]
         );
-        totalMethodCount += 1;
       });
     });
 
     // 3. Re-add “+ Create Method” if missing
     const addMethod = {
       id: 'add method',
-      position: { x: parentNode.position.x + 400, y: parentNode.position.y + totalMethodCount*50 + (data.subtasks.length - 2)*100  },
+      position: { x: parentNode.position.x + 200, 
+        y: parentNode.position.y + (data.subtasks.length-2)*100 +50},
       data: { label: '+ Create Method', onClick: handleAddMethod },
-      style: { background: moreNodeColor, cursor: 'pointer', border: 'none' }
+      style: {
+        width: '100px',
+        background: moreNodeColor,
+        height: '32px',
+        borderRadius: '16px',
+        border: 'none',
+        fontSize: '10px',
+      },
     };
     if (!nodes.some(n => n.id === 'add method')) {
       setNodes(prev => [...prev, addMethod]);
@@ -373,41 +421,51 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
         return {...edge};
       });
   
-      console.log('Updated edges:', updatedEdges);
-      console.log('New edges:', newEdges);
+
   
       return [...updatedEdges, ...newEdges];
     });
   };
+  
 
   // every confirsmation step has confirm, more options, add method and edit as options
   const handleConfirm = (yesNode, index, parentNode) => {
-    socket.emit("message", { type: "confirm_response", response: index });
+    socket.emit("message", { type: 'response_decomposition', response: index });
     console.log("User confirmed decomposition");
+    
+
   
     let nodesToKeep = new Set();
     let nodesToRemove = new Set();
     let yesNodeIdsToRemove = [];
+    const currentEdges = edgesRef.current;
+    const offsetY = index > 0 ? (index - 1) * 100 : 0;
+    const directTaskNodeIds = currentEdges
+    .filter(edge => edge.source === yesNode.id)
+    .map(edge => edge.target);
   
 
     setEdges(prevEdges => {
+      // Find all yesNodes connected to this parent
       const yesNodeEdges = prevEdges.filter(edge => edge.source === parentNode.id);
       const allYesNodeIds = yesNodeEdges.map(edge => edge.target);
+      
   
-
+      // Mark yesNodes other than the confirmed one for removal
       yesNodeIdsToRemove = allYesNodeIds.filter(id => id !== yesNode.id);
   
       yesNodeIdsToRemove.forEach(id => {
         nodesToRemove.add(id);
+        // Mark all nodes connected to rejected yesNodes for removal
         prevEdges.forEach(edge => {
           if (edge.source === id || edge.target === id) {
             if (edge.source !== parentNode.id) nodesToRemove.add(edge.source);
             if (edge.target !== parentNode.id) nodesToRemove.add(edge.target);
-          }          
+          }
         });
       });
   
-      // hide current yesNode
+      // Hide the edge connected to the confirmed yesNode
       const updatedEdges = prevEdges.map(edge => {
         if (edge.target === yesNode.id) {
           return { ...edge, hidden: true };
@@ -415,30 +473,45 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
         return edge;
       });
   
-      // remove task nodes connected to other yesNodes
+      // Remove all edges connected to rejected yesNodes or their children
       return updatedEdges.filter(edge =>
         !nodesToRemove.has(edge.source) && !nodesToRemove.has(edge.target)
       );
     });
   
     setNodes(prevNodes => {
-      return prevNodes.map(node => {
-        if (node.id === yesNode.id) {
-          return {
-            ...node,
-            hidden: true,
-            data: {
-              ...node.data,
-              label: '···',
-              onClick: () => handleUnhide(yesNode),
-            }
-          };
-        } else if (nodesToRemove.has(node.id)) {
-          return null; // mark for removal
-        }
-        return node;
-      }).filter(Boolean); 
-    });
+    
+
+    return prevNodes.map(node => {
+      
+      if (node.id === yesNode.id) {
+        return {
+          ...node,
+          hidden: true,
+          position: {
+            ...node.position,
+            y: node.position.y - offsetY
+          },
+          data: {
+            ...node.data,
+            label: '···',
+            onClick: () => handleUnhide(yesNode),
+          }
+        };
+      } else if (nodesToRemove.has(node.id)) {
+        return null;
+      } else if (directTaskNodeIds.includes(node.id)) {
+        return {
+          ...node,
+          position: {
+            ...node.position,
+            y: node.position.y - offsetY
+          }
+        };
+      }
+      return node;
+    }).filter(Boolean);
+  });
   
     updateNodesAndEdges();
     onConfirm();
@@ -446,7 +519,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
   
 
   const handleUnhide = (yesNode) => {
-    console.log("unhide clicked");
 
     let edgesToUnhide = [];
     let nodesToUnhide = [];
@@ -470,7 +542,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
     setNodes(prevNodes => {
       const updatedNodes = prevNodes.map(node => {
         if (node.id === yesNode.id) {
-          console.log('Setting yes node to unhide:', node);
           return {
             ...node,
             style: {
@@ -484,7 +555,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
             }
           };
         } else if (nodesToUnhide.includes(node.id)) {
-          console.log('Setting node to unhide:', node);
           return { ...node, hidden: false };
         } 
         return node;
@@ -495,7 +565,6 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
   };
 
   const handleHide = (yesNode) => {
-    console.log("hide clicked");
 
     let edgesToHide = [];
     let nodesToHide = [];
@@ -540,9 +609,56 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
     });
   };
 
+  const handleRejectClick = (yesNode, parentNode, data) => {
+    // Show noNode
+    const noNode = {
+      id: 'noNode',
+      position: {
+        x: yesNode.position.x - 15,
+        y: yesNode.position.y + 40,
+      },
+      data: {
+        label: 'More Options',
+        onClick: () => handleMoreOptionsClick(yesNode),
+      },
+      style: {
+        width: '100px',
+        background: moreNodeColor,
+        height: '32px',
+        borderRadius: '16px',
+        border: 'none',
+        fontSize: '10px',
+      },
+    };
+  
+    const addMethodNode = {
+      id: 'add method',
+      position: {
+        x: yesNode.position.x - 15,
+        y: yesNode.position.y + 80,
+      },
+      data: {
+        label: '+ Create Method',
+        onClick: handleAddMethod,
+      },
+      style: {
+        width: '100px',
+        background: moreNodeColor,
+        height: '32px',
+        borderRadius: '16px',
+        border: 'none',
+        fontSize: '10px',
+      },
+    };
+  
+    setNodes(prev => [...prev, noNode, addMethodNode]);
+  
+    setNodes(prev => prev.filter(n => n.id !== 'reject'));
+  };
+  
+
   // when user clicks "more options" button, remove the subtask[0] related nodes
-  const handleReject = (yesNode) => {
-      console.log("User rejected decomposition");
+  const handleMoreOptionsClick = (yesNode) => {
 
       let edgesToRemove = [];
       let nodesToRemove = [];
@@ -573,7 +689,7 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
     };
 
   const handleAddMethod = () => {
-    socket.emit("message", { type: "confirm_response", response: "add method" });
+    socket.emit("message", { type: 'response_decomposition', response: "add method" });
     onConfirm(null);
   };
  }
