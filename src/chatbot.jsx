@@ -57,13 +57,10 @@ function Chatbot({ socket, message }) {
         message['type'] === 'confirm_task_execution'
       ) {
         confirmation(message);
-      } else if (
-        message['type'] === 'map_correction' ||
-        message['type'] === 'ground_correction' ||
-        message['type'] === 'gen_correction'
-      ) {
-        correction(message);
-      }
+      } 
+      else if (message['type'] === 'map_correction'){correction(message,'map');}
+      else if (message['type'] === 'ground_correction'){correction(message,'ground');}
+      else if (message['type'] === 'gen_correction') {correction(message, 'ground');}
     }
   }, [message]);
 
@@ -130,9 +127,11 @@ function Chatbot({ socket, message }) {
     appendMessage("VAL", valPic, "left", data['text'], buttonsDiv);
   }
 
-  function correction(data) {
+  function correction(data,type) {
     const container = document.getElementById('prompt-message');
-    const known_tasks = data['known_tasks'];
+    let known_tasks = [];
+    if (type === 'map') {known_tasks = data['known_tasks'];}
+    if (type === 'ground') {known_tasks = data['env_objects'];}
 
     const dialog = document.createElement('div');
     dialog.className = 'chatbot-container val-output';
