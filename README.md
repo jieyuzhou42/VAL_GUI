@@ -3,6 +3,29 @@
 This repository implements the front-end GUI for **VAL**, an interactive agent system using **Hierarchical Task Network (HTN)** planning. The interface is built with **React** and visualized using **ReactFlow**. It communicates with the VAL back end through **WebSockets**.
 
 
+## 🧩 How to Run VAL GUI and Agent
+
+### 1. GUI Setup
+
+Make sure [Node.js](https://nodejs.org) is installed.
+
+Then, in the GUI project directory, run:
+
+```bash
+npm install   # Run this only once to install dependencies
+npm run dev   # Start the development server
+```
+### 2. VAL Agent Setup
+Make sure you have cloned the [VAL backend repository](https://github.com/Teachable-AI-Lab/val.git).
+In one terminal, navigate to the backend directory and start the server:
+```bash
+python val/user_interfaces/launch_server.py
+```
+In a second terminal, run the test script for the desired game environment:
+```bash
+python tests/<your_test_file>.py
+```
+
 ## Interaction Flow (Blocking Framework)
 
 The current framework uses a **blocking model**:
