@@ -715,10 +715,19 @@ useEffect(() => {
   };
   
   const handleEditClick = (task) => {
-    const taskNode = nodes.find((node) => node.id === task.hash);
+    const taskNode = nodesRef.current.find((node) => node.id === task.hash);
   
     if (!taskNode) {
-      console.error(`Node with id ${task.hash} does not exist.`);
+      console.warn(`Node with id ${task.hash} does not exist. Creating a new node.`);
+      const newNode = {
+        id: task.hash,
+        position: { x: 0, y: 0 }, // Default position
+        data: { label: task.Task },
+        style: { background: currentNodeColor, border: 'none' },
+        sourcePosition: 'right',
+        targetPosition: 'left',
+      };
+      setNodes((prevNodes) => [...prevNodes, newNode]);
       return;
     }
   
@@ -732,17 +741,19 @@ useEffect(() => {
               data: {
                 ...node.data,
                 label: (
-                  <input
-                    type="text"
-                    defaultValue={task.Task}
-                    onBlur={(e) => handleNodeEditBlur(e, task.hash)}
-                    style={{
-                      width: '100%',
-                      border: 'none',
-                      background: 'transparent',
-                      textAlign: 'center',
-                    }}
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      defaultValue={task.Task}
+                      onBlur={(e) => handleNodeEditBlur(e, task.hash)}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        background: 'transparent',
+                        textAlign: 'center',
+                      }}
+                    />
+                  </div>
                 ),
               },
             }
@@ -777,13 +788,26 @@ useEffect(() => {
     setNodes((prevNodes) => [...prevNodes, confirmButtonNode]);
   };
 
-  const handleConfirmEdit = (nodeId) => {
-    // Remove the confirm button node
+  const handleNodeEditBlur = (event, nodeId) => {
+    const newLabel = event.target.value;
     setNodes((prevNodes) =>
-      prevNodes.filter((node) => node.id !== `${nodeId}-confirm`)
+      prevNodes.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, label: newLabel } }
+          : node
+      )
     );
+  };
+
+  const handleConfirmEdit = (nodeId) => {
+    // Remove the confirm button
+    setNodes((prevNodes) => prevNodes.filter((node) => node.id !== `${nodeId}-confirm`));
   
-    console.log(`Changes to node ${nodeId} confirmed.`);
+    // Optionally, you can also send the updated node data to the server here
+    const updatedNode = nodesRef.current.find((node) => node.id === nodeId);
+    if (updatedNode) {
+      socket.emit("message", { type: 'edit_decomposition', response: updatedNode.data.label });
+    }
   };
 }
 
