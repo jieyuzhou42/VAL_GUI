@@ -715,13 +715,14 @@ useEffect(() => {
   };
   
   const handleEditClick = (task) => {
-    // Find the corresponding node to get its position
     const taskNode = nodes.find((node) => node.id === task.hash);
   
-    if (!taskNode || !taskNode.position) {
-      console.error(`Node with id ${task.hash} does not have a valid position.`);
+    if (!taskNode) {
+      console.error(`Node with id ${task.hash} does not exist.`);
       return;
     }
+  
+    const position = taskNode.position || { x: 0, y: 0 }; // Fallback position
   
     setNodes((prevNodes) =>
       prevNodes.map((node) =>
@@ -749,19 +750,17 @@ useEffect(() => {
       )
     );
   
-    // Add a confirm button below the edit button
     const confirmButtonNode = {
       id: `${task.hash}-confirm`,
       position: {
-        x: taskNode.position.x + 155, // Same x position as the edit button
-        y: taskNode.position.y + 30, // Slightly below the edit button
+        x: position.x + 155, // Same x position as the edit button
+        y: position.y + 30, // Slightly below the edit button
       },
       data: {
         label: '✔',
         onClick: () => handleConfirmEdit(task.hash),
       },
       style: {
-        // background: '#FFFFFF',
         background: 'none',
         width: '20px',
         height: '20px',
