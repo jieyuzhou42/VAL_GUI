@@ -249,8 +249,6 @@ useEffect(() => {
 
     setNodes(prev => [...prev, rejectNode]);
 
-
-
     const newNodes = [];
     const newEdges = [];
 
@@ -281,7 +279,6 @@ useEffect(() => {
 
       newNodes.push(taskNode);
 
-
       // Add edge from yes node to task node
       newEdges.push({
         id: `e-${parentNode.id}-unhide-${taskNode.id}`,
@@ -299,6 +296,36 @@ useEffect(() => {
         // debugging
         // label: `e-${parentNode.id}-unhide-${taskNode.id}`,
       });
+
+      // if (subIndex === 0) {
+      // Add edit button next to the task node
+      const editButtonNode = {
+        id: `${task.hash}-edit`,
+        position: {
+          x: taskNode.position.x + 155, // Position next to the task node
+          y: taskNode.position.y,
+        },
+        data: {
+          label: '✎',
+          onClick: () => handleEditClick(task),
+        },
+        style: {
+          // background: '#FFFFFF',
+          background: 'none',
+          width: '20px',
+          height: '20px',
+          borderRadius: 'none',
+          border: '1px solid black',
+          fontSize: '10px',
+          textAlign: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+      };
+
+      newNodes.push(editButtonNode);
+      // }
     });
 
   setNodes(prev => [...prev, ...newNodes]);
@@ -420,9 +447,7 @@ useEffect(() => {
         } 
         return {...edge};
       });
-  
 
-  
       return [...updatedEdges, ...newEdges];
     });
   };
@@ -432,10 +457,7 @@ useEffect(() => {
   const handleConfirm = (yesNode, index, parentNode) => {
     socket.emit("message", { type: 'response_decomposition', response: index });
     console.log("User confirmed decomposition");
-    
 
-  
-    let nodesToKeep = new Set();
     let nodesToRemove = new Set();
     let yesNodeIdsToRemove = [];
     const currentEdges = edgesRef.current;
@@ -450,7 +472,6 @@ useEffect(() => {
       const yesNodeEdges = prevEdges.filter(edge => edge.source === parentNode.id);
       const allYesNodeIds = yesNodeEdges.map(edge => edge.target);
       
-  
       // Mark yesNodes other than the confirmed one for removal
       yesNodeIdsToRemove = allYesNodeIds.filter(id => id !== yesNode.id);
   
@@ -480,8 +501,7 @@ useEffect(() => {
     });
   
     setNodes(prevNodes => {
-    
-
+  
     return prevNodes.map(node => {
       
       if (node.id === yesNode.id) {
@@ -510,13 +530,14 @@ useEffect(() => {
         };
       }
       return node;
-    }).filter(Boolean);
+    })
+    .filter(Boolean)
+    .filter(node => !node.id.endsWith('-edit')); // Remove all edit buttons
   });
   
     updateNodesAndEdges();
     onConfirm();
   };
-  
 
   const handleUnhide = (yesNode) => {
 
@@ -692,7 +713,79 @@ useEffect(() => {
     socket.emit("message", { type: 'response_decomposition', response: "add method" });
     onConfirm(null);
   };
- }
+  
+  const handleEditClick = (task) => {
+    // Find the corresponding node to get its position
+    const taskNode = nodes.find((node) => node.id === task.hash);
+  
+    if (!taskNode || !taskNode.position) {
+      console.error(`Node with id ${task.hash} does not have a valid position.`);
+      return;
+    }
+  
+    setNodes((prevNodes) =>
+      prevNodes.map((node) =>
+        node.id === task.hash
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                label: (
+                  <input
+                    type="text"
+                    defaultValue={task.Task}
+                    onBlur={(e) => handleNodeEditBlur(e, task.hash)}
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      background: 'transparent',
+                      textAlign: 'center',
+                    }}
+                  />
+                ),
+              },
+            }
+          : node
+      )
+    );
+  
+    // Add a confirm button below the edit button
+    const confirmButtonNode = {
+      id: `${task.hash}-confirm`,
+      position: {
+        x: taskNode.position.x + 155, // Same x position as the edit button
+        y: taskNode.position.y + 30, // Slightly below the edit button
+      },
+      data: {
+        label: '✔',
+        onClick: () => handleConfirmEdit(task.hash),
+      },
+      style: {
+        // background: '#FFFFFF',
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+  
+    setNodes((prevNodes) => [...prevNodes, confirmButtonNode]);
+  };
 
+  const handleConfirmEdit = (nodeId) => {
+    // Remove the confirm button node
+    setNodes((prevNodes) =>
+      prevNodes.filter((node) => node.id !== `${nodeId}-confirm`)
+    );
+  
+    console.log(`Changes to node ${nodeId} confirmed.`);
+  };
+}
 
 export default ConfirmBestMatchDecomposition;
