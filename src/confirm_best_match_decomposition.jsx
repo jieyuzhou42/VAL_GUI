@@ -38,6 +38,7 @@ useEffect(() => {
 
 useEffect(() => {
   nodesRef.current = nodes;
+  console.log("Updated nodesRef:", nodesRef.current);
 }, [nodes]);
 
 
@@ -713,6 +714,9 @@ useEffect(() => {
     socket.emit("message", { type: 'response_decomposition', response: "add method" });
     onConfirm(null);
   };
+
+  const dropdownOptions1 = ["boil", "wait", "get", "go", "interact", "put"];
+  const dropdownOptions2 = ["dish", "onion", "pot"];  
   
   const handleEditClick = (task) => {
     const taskNode = nodesRef.current.find((node) => node.id === task.hash);
@@ -722,7 +726,7 @@ useEffect(() => {
       const newNode = {
         id: task.hash,
         position: { x: 0, y: 0 }, // Default position
-        data: { label: task.Task },
+        data: { label: task.Task, dropdown1: "Default Option 1", dropdown2: "Default Choice A" },
         style: { background: currentNodeColor, border: 'none' },
         sourcePosition: 'right',
         targetPosition: 'left',
@@ -741,20 +745,43 @@ useEffect(() => {
               data: {
                 ...node.data,
                 label: (
-                  <div>
-                    <input
-                      type="text"
-                      defaultValue={task.Task}
-                      onBlur={(e) => handleNodeEditBlur(e, task.hash)}
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    <select
+                      defaultValue={node.data.dropdown1 || "Default Option 1"}
+                      onChange={(e) => handleNodeEditChange(e, task.hash, 'dropdown1')}
                       style={{
-                        width: '100%',
-                        border: 'none',
-                        background: 'transparent',
+                        width: '100px',
+                        border: '1px solid black',
+                        background: 'white',
                         textAlign: 'center',
                       }}
-                    />
+                    >
+                      {dropdownOptions1.map((option, index) => (
+                        <option key={index} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      defaultValue={node.data.dropdown2 || "Default Choice A"}
+                      onChange={(e) => handleNodeEditChange(e, task.hash, 'dropdown2')}
+                      style={{
+                        width: '100px',
+                        border: '1px solid black',
+                        background: 'white',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {dropdownOptions2.map((option, index) => (
+                        <option key={index} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 ),
+                dropdown1: node.data.dropdown1 || "Default Option 1", // Retain dropdown1
+                dropdown2: node.data.dropdown2 || "Default Choice A", // Retain dropdown2
               },
             }
           : node
@@ -765,7 +792,7 @@ useEffect(() => {
       id: `${task.hash}-confirm`,
       position: {
         x: position.x + 155, // Same x position as the edit button
-        y: position.y + 30, // Slightly below the edit button
+        y: position.y + 60, // Slightly below the edit button
       },
       data: {
         label: '✔',
@@ -784,30 +811,121 @@ useEffect(() => {
         alignItems: 'center',
       },
     };
+
+    // Trash button node
+    const trashButtonNode = {
+      id: `${task.hash}-trash`,
+      position: {
+        x: position.x + 155, // Position next to the confirm button
+        y: position.y + 30, // Same vertical alignment as the confirm button
+      },
+      data: {
+        label: '🗑',
+        onClick: () => handleTrashClick(task.hash),
+      },
+      style: {
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
   
-    setNodes((prevNodes) => [...prevNodes, confirmButtonNode]);
+    setNodes((prevNodes) => [...prevNodes, confirmButtonNode, trashButtonNode]);
   };
 
-  const handleNodeEditBlur = (event, nodeId) => {
-    const newLabel = event.target.value;
-    setNodes((prevNodes) =>
-      prevNodes.map((node) =>
+  const handleNodeEditChange = (event, nodeId, dropdown) => {
+    const newValue = event.target.value;
+  
+    setNodes((prevNodes) => {
+      const nodeExists = prevNodes.some((node) => node.id === nodeId);
+      if (!nodeExists) {
+        console.warn(`Node with id ${nodeId} not found.`);
+        return prevNodes;
+      }
+  
+      const updatedNodes = prevNodes.map((node) =>
         node.id === nodeId
-          ? { ...node, data: { ...node.data, label: newLabel } }
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                [dropdown]: newValue, // Update the specific dropdown value
+              },
+            }
           : node
-      )
-    );
+      );
+  
+      // Explicitly update nodesRef
+      nodesRef.current = updatedNodes;
+      return updatedNodes;
+    });
   };
 
   const handleConfirmEdit = (nodeId) => {
-    // Remove the confirm button
-    setNodes((prevNodes) => prevNodes.filter((node) => node.id !== `${nodeId}-confirm`));
-  
-    // Optionally, you can also send the updated node data to the server here
+    // Remove the confirm button and the trash button
+    setNodes((prevNodes) =>
+      prevNodes.filter(
+        (node) => node.id !== `${nodeId}-confirm` && node.id !== `${nodeId}-trash`
+      )
+    );
+    
+    // Find the updated node
     const updatedNode = nodesRef.current.find((node) => node.id === nodeId);
+  
     if (updatedNode) {
-      socket.emit("message", { type: 'edit_decomposition', response: updatedNode.data.label });
+      const dropdown1Value = updatedNode.data.dropdown1 || "Default Option 1";
+      const dropdown2Value = updatedNode.data.dropdown2 || "Default Choice A";
+  
+      // Update the node to return to its original interface
+      setNodes((prevNodes) =>
+        prevNodes.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  label: `${dropdown1Value} ${dropdown2Value}`, // Combine dropdown values as the new label
+                  dropdown1: dropdown1Value, // Retain dropdown1
+                  dropdown2: dropdown2Value, // Retain dropdown2
+                },
+              }
+            : node
+        )
+      );
+  
+      // Send the selected values to the server
+      socket.emit("message", {
+        type: 'edit_decomposition',
+        response: { dropdown1: dropdown1Value, dropdown2: dropdown2Value },
+      });
+    } else {
+      console.error(`Node with id ${nodeId} not found.`);
     }
+  };
+
+  const handleTrashClick = (nodeId) => {
+    // Remove the node and its associated buttons (trash, confirm, edit)
+    setNodes((prevNodes) =>
+      prevNodes.filter(
+        (node) =>
+          node.id !== nodeId && // Remove the main node
+          node.id !== `${nodeId}-trash` && // Remove the trash button
+          node.id !== `${nodeId}-confirm` && // Remove the confirm button
+          node.id !== `${nodeId}-edit` // Remove the edit button
+      )
+    );
+    
+    // Send a message to the server
+    socket.emit("message", {
+      type: 'edit_decomposition'
+    });
   };
 }
 
