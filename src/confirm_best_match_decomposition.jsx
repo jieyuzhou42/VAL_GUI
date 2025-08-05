@@ -1,7 +1,7 @@
 import { useEffect,useState,useRef } from "react";
 import '@xyflow/react/dist/style.css';
 import { MarkerType, SimpleBezierEdge } from '@xyflow/react';
-
+import Chatbot from './chatbot';
 
 const currentNodeColor = 'rgb(205, 221, 249)';
 const currentEdgeColor = 'rgb(132, 171, 249)';
@@ -24,8 +24,7 @@ function findAllAncestors(nodeId, edges) {
   return ancestors;
 }
 
-function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
-        nodes, edges, setNodes, setEdges }) {
+function ConfirmBestMatchDecomposition({ data, socket, onConfirm, nodes, edges, setNodes, setEdges, message }) {
   // console.log("nodes in ConfirmDecomp:", nodes);
   // console.log('edges in ConfirmDecomp:', edges);
   const [showAllOptions, setShowAllOptions] = useState(false);
@@ -421,6 +420,190 @@ useEffect(() => {
     }
 
   }, [showAllOptions]);
+
+  const chatbotNode = {
+    id: 'chatbot-node',
+    position: { x: 500, y: 300 }, // Position of the node
+    data: {
+      label: (
+        <div style={{ width: '300px', height: '400px' }}>
+          <Chatbot socket={socket} message={message} />
+        </div>
+      ),
+    },
+    style: {
+      background: '#f0f0f0',
+      border: '1px solid #ccc',
+      borderRadius: '8px',
+      width: '320px',
+      height: '420px',
+    },
+    sourcePosition: 'right',
+    targetPosition: 'left',
+  };
+  
+  // Add the chatbot node to the nodes array
+  // if (!nodes.some((node) => node.id === chatbotNode.id)) {
+  //   setNodes((prevNodes) => [...prevNodes, chatbotNode]);
+  // }
+
+  // useEffect(() => {
+  //   if (!nodes.some((node) => node.id === 'chatbot-node')) {
+  //     setNodes((prevNodes) => [
+  //       ...prevNodes,
+  //       {
+  //         id: 'chatbot-node',
+  //         position: { x: 500, y: 300 }, // Position of the node
+  //         data: {
+  //           label: (
+  //             <div style={{ width: '300px', height: '400px' }}>
+  //               <Chatbot socket={socket} message={message} />
+  //             </div>
+  //           ),
+  //         },
+  //         style: {
+  //           background: '#f0f0f0',
+  //           border: '1px solid #ccc',
+  //           borderRadius: '8px',
+  //           width: '320px',
+  //           height: '420px',
+  //         },
+  //         sourcePosition: 'right',
+  //         targetPosition: 'left',
+  //       },
+  //     ]);
+  //   }
+  // }, [nodes, socket, message, setNodes]);
+
+  // const [message, setMessage] = useState(null);
+
+  // useEffect(() => {
+  //   socket.on('message', (newMessage) => {
+  //     console.log("Received message from server:", newMessage);
+  //     setMessage(newMessage);
+  //   });
+  // }, [socket]);
+
+  console.log("Message in parent component:", message);
+
+  useEffect(() => {
+    const handleMessage = (newMessage) => {
+      console.log("Received message from server:", newMessage);
+      setMessage(newMessage);
+  
+      if (newMessage?.type === 'ask_subtasks') {
+        console.log("Handling 'ask_subtasks' in ConfirmBestMatchDecomposition:", newMessage);
+      }
+    };
+  
+    // Add the listener
+    socket.on('message', handleMessage);
+  
+    // Cleanup the listener when the component unmounts or before re-adding
+    return () => {
+      socket.off('message', handleMessage);
+    };
+  }, [socket]);
+
+  // const [message, setMessage] = useState(null);
+
+  // useEffect(() => {
+  //   if (!message) {
+  //     console.warn("Message is undefined or null.");
+  //     return;
+  //   }
+  
+  //   console.log("useEffect triggered with message:", message);
+  
+  //   if (message?.type === 'ask_subtasks') {
+  //     console.log("Handling 'ask_subtasks' in ConfirmBestMatchDecomposition:", message);
+  //     // Your existing logic here
+  //   }
+  // }, [message, nodes, socket]);
+
+  useEffect(() => {
+    console.log("useEffect triggered with message:", message);
+
+    if (message?.type === 'ask_subtasks') {
+      console.log("Handling 'ask_subtasks' in ConfirmBestMatchDecomposition:", message);
+
+      const targetNodeId = 'add method'; // Target the node with id 'add method'
+      const targetNode = nodes.find((node) => node.id === targetNodeId);
+      console.log("Target Node:", targetNode);
+
+      if (targetNode) {
+        // If the node exists, embed the chatbot inside it
+        setNodes((prevNodes) => {
+          const updatedNodes = [...prevNodes];
+          const nodeIndex = updatedNodes.findIndex((node) => node.id === targetNodeId);
+          if (nodeIndex !== -1) {
+            updatedNodes[nodeIndex] = {
+              ...updatedNodes[nodeIndex],
+              data: {
+                ...updatedNodes[nodeIndex].data,
+                label: <Chatbot socket={socket} message={message} />,
+              },
+            };
+          }
+          return updatedNodes;
+        });
+      } else {
+        console.warn("Target node not found. Displaying chatbot elsewhere.");
+        // If the node does not exist, display the chatbot elsewhere
+        setNodes((prevNodes) => [
+          ...prevNodes,
+          {
+            id: 'chatbot-floating',
+            position: { x: 500, y: 300 }, // Position for the floating chatbot
+            data: {
+              label: (
+                <div style={{ width: '300px', height: '400px' }}>
+                  <Chatbot socket={socket} message={message} />
+                </div>
+              ),
+            },
+            style: {
+              background: '#f0f0f0',
+              border: '1px solid #ccc',
+              borderRadius: '8px',
+              width: '320px',
+              height: '420px',
+            },
+            sourcePosition: 'right',
+            targetPosition: 'left',
+          },
+        ]);
+      }
+    }
+  }, [message, nodes, socket]);
+
+  // useEffect(() => {
+  //   if (!data || !data.head) {
+  //     console.warn("Data or data.head is missing. Skipping logic.");
+  //     return;
+  //   }
+  
+  //   let parentNode = nodes.find(n => n.id.includes(data.head.hash));
+  
+  //   if (!parentNode) {
+  //     // If node is empty, create the parent node
+  //     parentNode = {
+  //       id: data.head.hash,
+  //       position: { x: 0, y: 0 },
+  //       data: { label: `${data.head.name} ${data.head.V}` },
+  //       style: { 
+  //         border: 'none',
+  //         background: currentNodeColor,
+  //       },
+  //       sourcePosition: 'right',
+  //       targetPosition: 'left',
+  //     };
+  
+  //     setNodes(prev => [...prev, parentNode]);
+  //   } else {
+  //     // Logic for when the parent node exists
+  //   }
+  // }, [data, nodes, setNodes]);
 
   // This function updates the nodes and edges when user confirms or rejects decomposition
   const updateNodesAndEdges = () => {

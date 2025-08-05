@@ -75,7 +75,7 @@ useEffect(() => {
             setEdges={setEdges} 
           />
 
-          {message?.type === 'confirm_best_match_decomposition' && (
+          {(message?.type === 'confirm_best_match_decomposition' || message?.type === 'ask_subtasks') && (
             <ConfirmBestMatchDecomposition 
               data={message.text} 
               onConfirm={handleConfirm}
@@ -84,6 +84,7 @@ useEffect(() => {
               setNodes={setNodes}
               setEdges={setEdges}
               socket={socket}
+              message={message} // Pass the message prop here
             />
           )}
           {message?.type === 'display_added_method' && (
