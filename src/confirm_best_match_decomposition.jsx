@@ -25,7 +25,7 @@ function findAllAncestors(nodeId, edges) {
 }
 
 function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
-        nodes, edges, setNodes, setEdges }) {
+        nodes, edges, setNodes, setEdges, setChatbotPosition }) {
   // console.log("nodes in ConfirmDecomp:", nodes);
   // console.log('edges in ConfirmDecomp:', edges);
   const [showAllOptions, setShowAllOptions] = useState(false);
@@ -406,7 +406,13 @@ useEffect(() => {
       id: 'add method',
       position: { x: parentNode.position.x + 200, 
         y: parentNode.position.y + (data.subtasks.length-2)*100 +50},
-      data: { label: '+ Create Method', onClick: handleAddMethod },
+      data: { 
+        label: '+ Create Method', 
+        onClick: () => {
+          console.log("Add Method Node:", addMethod); // Debugging
+          handleAddMethod(addMethod) // Pass the node directly 
+          }
+      },
       style: {
         width: '100px',
         background: moreNodeColor,
@@ -661,7 +667,10 @@ useEffect(() => {
       },
       data: {
         label: '+ Create Method',
-        onClick: handleAddMethod,
+        onClick: () => {
+          console.log("Add Method Node:", addMethodNode); // Debugging
+          handleAddMethod(addMethodNode) // Pass the node directly 
+          }
       },
       style: {
         width: '100px',
@@ -710,7 +719,27 @@ useEffect(() => {
       setShowAllOptions(true);
     };
 
-  const handleAddMethod = () => {
+  const handleAddMethod = (addMethodNode) => {
+    if (addMethodNode) {
+      // Log the position of the "Add Method" node
+      console.log("Add Method Node Position:", addMethodNode.position);
+  
+      // Set the chatbot's position to match the "Add Method" button's position
+      setChatbotPosition({
+        x: addMethodNode.position.x,
+        y: addMethodNode.position.y,
+      });
+  
+      // Log the calculated chatbot position
+      console.log("Chatbot Position Set To:", {
+        top: addMethodNode.position.y,
+        right: window.innerWidth - addMethodNode.position.x - 100,
+      });
+    } else {
+      console.warn("Add Method Node not passed to handleAddMethod.");
+    }
+  
+    // Emit a message to the server
     socket.emit("message", { type: 'response_decomposition', response: "add method" });
     onConfirm(null);
   };
