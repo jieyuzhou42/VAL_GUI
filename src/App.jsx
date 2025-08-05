@@ -77,7 +77,10 @@ function App () {
           {
             id: 'chatbot-node',
             type: 'chatbot',
-            position: chatbotPosition,
+            position: {
+              x: chatbotPosition.x,
+              y: chatbotPosition.y + 25, // 👈 change here
+            },
             data: { socket, message },
             draggable: false,
             selectable: false,
