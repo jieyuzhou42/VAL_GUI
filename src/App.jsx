@@ -36,24 +36,24 @@ function App () {
   }, [message]);
 
   // Show chatbot when ask_subtasks message is received
-useEffect(() => {
-  if (message?.type === 'ask_subtasks') {
-    setShowChatbot(true);
-  }
-}, [message]);
+  useEffect(() => {
+    if (message?.type === 'ask_subtasks') {
+      setShowChatbot(true);
+    }
+  }, [message]);
 
-useEffect(() => {
-  if (message?.type === 'segment_confirmation') {
-    setShowChatbot(true);
-  }
-}, [message]);
+  useEffect(() => {
+    if (message?.type === 'segment_confirmation') {
+      setShowChatbot(true);
+    }
+  }, [message]);
 
-useEffect(() => {
-  if (message?.type === 'request_user_task') {
-    setNodes([]);
-    setEdges([]);
-  }
-}, [message]);
+  useEffect(() => {
+    if (message?.type === 'request_user_task') {
+      setNodes([]);
+      setEdges([]);
+    }
+  }, [message]);
   
   // This function hide confirm component
   const handleConfirm = () => {
@@ -61,6 +61,32 @@ useEffect(() => {
   };
   console.log("nodes in app", nodes);
 
+  // Add chatbot node when showChatbot is true
+  useEffect(() => {
+    if (showChatbot) {
+      setNodes(prevNodes => {
+        const otherNodes = prevNodes.filter(n => n.id !== 'chatbot-node');
+        return [
+          ...otherNodes,
+          {
+            id: 'chatbot-node',
+            type: 'chatbot',
+            position: { x: 50, y: 50 },
+            data: { socket, message },
+            draggable: false,
+            selectable: false,
+          }
+        ];
+      });
+    }
+  }, [showChatbot, message]);
+
+  // Remove chatbot node when showChatbot becomes false
+  useEffect(() => {
+    if (!showChatbot) {
+      setNodes(prev => prev.filter(n => n.id !== 'chatbot-node'));
+    }
+  }, [showChatbot]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh' }}>
@@ -101,7 +127,7 @@ useEffect(() => {
         </>
       )}
 
-      {showChatbot && (
+      {/* {showChatbot && (
       <div
         style={{
           position: 'absolute',
@@ -112,7 +138,7 @@ useEffect(() => {
       >
         <Chatbot socket={socket} message={message}/>
       </div>
-    )}
+    )} */}
   </div>
   );
 }
