@@ -5,9 +5,7 @@ import Chatbot from './chatbot';
 
 const nodeTypes = {
   chatbot: ({ data }) => (
-    // <div style={{ width: '300px', height: '400px' }}>
-      <Chatbot socket={data.socket} message={data.message} />
-    // </div>
+    <div><Chatbot socket={data.socket} message={data.message} /></div>
   )
 };
 

@@ -14,6 +14,7 @@ function App () {
   const [showChatbot, setShowChatbot] = useState(false);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
+  const [chatbotPosition, setChatbotPosition] = useState({ x: 50, y: 50 });
   // these are constants that pass through each components
   // all components just make changes to these constants
   // and display renders them
@@ -22,6 +23,11 @@ function App () {
     socket.on('message', (data) => {
       console.log('Received from server:', data);
       setMessage(data);
+
+      // ✅ 위치 정보가 있으면 모든 메시지에 대해 chatbot 위치 업데이트
+      if (data?.position) {
+        setChatbotPosition(data.position);
+      }
     });
     return () => {
       socket.off('message');
@@ -71,7 +77,7 @@ function App () {
           {
             id: 'chatbot-node',
             type: 'chatbot',
-            position: { x: 50, y: 50 },
+            position: chatbotPosition,
             data: { socket, message },
             draggable: false,
             selectable: false,
@@ -79,7 +85,7 @@ function App () {
         ];
       });
     }
-  }, [showChatbot, message]);
+  }, [showChatbot, message, chatbotPosition]); // include chatbotPosition  
 
   // Remove chatbot node when showChatbot becomes false
   useEffect(() => {
