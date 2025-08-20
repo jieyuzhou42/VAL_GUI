@@ -24,7 +24,7 @@ function App () {
       console.log('Received from server:', data);
       setMessage(data);
 
-      // ✅ 위치 정보가 있으면 모든 메시지에 대해 chatbot 위치 업데이트
+      // ✅ If position information is present, update chatbot position for every message
       if (data?.position) {
         setChatbotPosition(data.position);
       }
