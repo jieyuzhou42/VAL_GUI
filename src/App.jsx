@@ -90,7 +90,7 @@ function App () {
       console.log("Restored nodes:", restoredNodes.map(node => ({ id: node.id, x: node.position.x })));
       setNodes(restoredNodes); // Apply restored nodes to state
   
-      // 상태 업데이트 후 확인
+      // Check after state update
       setTimeout(() => {
         console.log("Nodes after restoring:", nodes.map(node => ({ id: node.id, x: node.position.x })));
         console.log("Clearing movedNodesRef...");
