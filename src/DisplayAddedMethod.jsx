@@ -284,8 +284,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
     const handleConfirm = (yesNode, index, parentNode) => {
       socket.emit("message", { type: 'response_decomposition', response: index });
       console.log("User confirmed decomposition");
-      
-  
     
       let nodesToKeep = new Set();
       let nodesToRemove = new Set();

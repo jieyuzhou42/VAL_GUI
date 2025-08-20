@@ -199,19 +199,6 @@ function App () {
           {message?.type === 'edit_decomposition' && <EditDecomposition data={message.text} />}
         </>
       )}
-
-      {/* {showChatbot && (
-      <div
-        style={{
-          position: 'absolute',
-          top: 50,
-          right: 50,
-          zIndex: 9999, // ensures it's above the flow
-        }}
-      >
-        <Chatbot socket={socket} message={message}/>
-      </div>
-    )} */}
   </div>
   );
 }
