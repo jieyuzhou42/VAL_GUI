@@ -151,7 +151,7 @@ function App () {
             type: 'chatbot',
             position: {
               x: chatbotPosition.x,
-              y: chatbotPosition.y - 200, // 👈 change here
+              y: chatbotPosition.y - 200, // Offset the chatbot's vertical position by 200 units
             },
             data: { socket, message },
             draggable: false,
