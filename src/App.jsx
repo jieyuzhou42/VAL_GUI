@@ -46,7 +46,15 @@ function App () {
               console.log(`Saving original position of node ${node.id}: ${node.position.x}`);
               movedNodesRef.current.set(node.id, node.position.x); // Save original position
             }
-            console.log(`Moving node ${node.id} from x: ${node.position.x} to x: ${node.position.x + 350}`);
+      // console.log("Chatbot is visible. Moving nodes...");
+      setNodes(prevNodes =>
+        prevNodes.map(node => {
+          if (node.position.x > chatbotPosition.x - 50) {
+            if (!movedNodesRef.current.has(node.id)) {
+              // console.log(`Saving original position of node ${node.id}: ${node.position.x}`);
+              movedNodesRef.current.set(node.id, node.position.x); // Save original position
+            }
+            // console.log(`Moving node ${node.id} from x: ${node.position.x} to x: ${node.position.x + 350}`);
             return {
               ...node,
               position: {
