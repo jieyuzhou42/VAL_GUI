@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 import RequestUserTask from './requestUserTask';
 import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
@@ -33,6 +33,70 @@ function App () {
       socket.off('message');
     };
   }, []);
+
+  const movedNodesRef = useRef(new Map()); // Store original positions of moved nodes
+
+  useEffect(() => {
+    if (showChatbot) {
+      console.log("Chatbot is visible. Moving nodes...");
+      setNodes(prevNodes =>
+        prevNodes.map(node => {
+          if (node.position.x > chatbotPosition.x - 50) {
+            if (!movedNodesRef.current.has(node.id)) {
+              console.log(`Saving original position of node ${node.id}: ${node.position.x}`);
+              movedNodesRef.current.set(node.id, node.position.x); // Save original position
+            }
+            console.log(`Moving node ${node.id} from x: ${node.position.x} to x: ${node.position.x + 350}`);
+            return {
+              ...node,
+              position: {
+                ...node.position,
+                x: node.position.x + 350, // Shift node to the right
+              },
+            };
+          }
+          return node;
+        })
+      );
+      console.log("Moved nodes after moving:", Array.from(movedNodesRef.current.entries()));
+    } else {
+      console.log("Chatbot is hidden. Restoring nodes...");
+      console.log("Nodes before restoring:", nodes.map(node => ({ id: node.id, x: node.position.x })));
+      console.log("Moved nodes before restoring:", Array.from(movedNodesRef.current.entries()));
+  
+      // Force state update with restored nodes
+      const restoredNodes = nodes.map(node => {
+        if (movedNodesRef.current.has(node.id)) {
+          console.log(`Restoring node ${node.id} to original x: ${movedNodesRef.current.get(node.id)}`);
+          return {
+            ...node,
+            position: {
+              ...node.position,
+              x: movedNodesRef.current.get(node.id), // Restore original x position
+            },
+          };
+        }
+        return node;
+      });
+  
+      console.log("Restored nodes:", restoredNodes.map(node => ({ id: node.id, x: node.position.x })));
+      setNodes(restoredNodes); // Apply restored nodes to state
+  
+      // 상태 업데이트 후 확인
+      setTimeout(() => {
+        console.log("Nodes after restoring:", nodes.map(node => ({ id: node.id, x: node.position.x })));
+        console.log("Clearing movedNodesRef...");
+        movedNodesRef.current.clear(); // Clear the record of moved nodes
+        console.log("Moved nodes after clearing:", Array.from(movedNodesRef.current.entries()));
+      }, 0); // 상태 업데이트 후 로그 확인
+    }
+  }, [showChatbot, chatbotPosition]);
+  
+  useEffect(() => {
+    if (message?.type === 'display_added_method') {
+      setShowChatbot(false); // Hide the chatbot
+    }
+  }, [message]);
 
   //after user create a method hide the chat box automatically
   useEffect(() => {
@@ -79,7 +143,7 @@ function App () {
             type: 'chatbot',
             position: {
               x: chatbotPosition.x,
-              y: chatbotPosition.y + 25, // 👈 change here
+              y: chatbotPosition.y - 200, // 👈 change here
             },
             data: { socket, message },
             draggable: false,
