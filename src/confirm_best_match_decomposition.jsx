@@ -38,7 +38,6 @@ useEffect(() => {
 
 useEffect(() => {
   nodesRef.current = nodes;
-  console.log("Updated nodesRef:", nodesRef.current);
 }, [nodes]);
 
 
