@@ -88,7 +88,7 @@ function App () {
         console.log("Clearing movedNodesRef...");
         movedNodesRef.current.clear(); // Clear the record of moved nodes
         console.log("Moved nodes after clearing:", Array.from(movedNodesRef.current.entries()));
-      }, 0); // 상태 업데이트 후 로그 확인
+      }, 0); // Check logs after state update
     }
   }, [showChatbot, chatbotPosition]);
   
