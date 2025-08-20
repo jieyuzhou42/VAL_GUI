@@ -24,7 +24,7 @@ function App () {
       console.log('Received from server:', data);
       setMessage(data);
 
-      // ✅ 위치 정보가 있으면 모든 메시지에 대해 chatbot 위치 업데이트
+      // ✅ If position information is present, update chatbot position for every message
       if (data?.position) {
         setChatbotPosition(data.position);
       }
@@ -46,7 +46,15 @@ function App () {
               console.log(`Saving original position of node ${node.id}: ${node.position.x}`);
               movedNodesRef.current.set(node.id, node.position.x); // Save original position
             }
-            console.log(`Moving node ${node.id} from x: ${node.position.x} to x: ${node.position.x + 350}`);
+      // console.log("Chatbot is visible. Moving nodes...");
+      setNodes(prevNodes =>
+        prevNodes.map(node => {
+          if (node.position.x > chatbotPosition.x - 50) {
+            if (!movedNodesRef.current.has(node.id)) {
+              // console.log(`Saving original position of node ${node.id}: ${node.position.x}`);
+              movedNodesRef.current.set(node.id, node.position.x); // Save original position
+            }
+            // console.log(`Moving node ${node.id} from x: ${node.position.x} to x: ${node.position.x + 350}`);
             return {
               ...node,
               position: {
@@ -82,13 +90,13 @@ function App () {
       console.log("Restored nodes:", restoredNodes.map(node => ({ id: node.id, x: node.position.x })));
       setNodes(restoredNodes); // Apply restored nodes to state
   
-      // 상태 업데이트 후 확인
+      // Check after state update
       setTimeout(() => {
         console.log("Nodes after restoring:", nodes.map(node => ({ id: node.id, x: node.position.x })));
         console.log("Clearing movedNodesRef...");
         movedNodesRef.current.clear(); // Clear the record of moved nodes
         console.log("Moved nodes after clearing:", Array.from(movedNodesRef.current.entries()));
-      }, 0); // 상태 업데이트 후 로그 확인
+      }, 0); // Check logs after state update
     }
   }, [showChatbot, chatbotPosition]);
   
@@ -143,7 +151,7 @@ function App () {
             type: 'chatbot',
             position: {
               x: chatbotPosition.x,
-              y: chatbotPosition.y - 200, // 👈 change here
+              y: chatbotPosition.y - 200, // Offset the chatbot's vertical position by 200 units
             },
             data: { socket, message },
             draggable: false,

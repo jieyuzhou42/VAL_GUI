@@ -38,7 +38,6 @@ useEffect(() => {
 
 useEffect(() => {
   nodesRef.current = nodes;
-  console.log("Updated nodesRef:", nodesRef.current);
 }, [nodes]);
 
 
@@ -713,7 +712,6 @@ useEffect(() => {
   const handleAddMethod = () => {
     const addMethodNode = nodesRef.current.find(n => n.id === 'add method');
     const position = addMethodNode?.position || { x: 50, y: 50 };
-    console.log("Adding method at position:", position);
   
     socket.emit("message", {
       type: 'response_decomposition',
