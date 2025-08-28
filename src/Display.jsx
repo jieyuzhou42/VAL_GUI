@@ -1,6 +1,13 @@
 import React from 'react';
 import { ReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import Chatbot from './chatbot';
+
+const nodeTypes = {
+  chatbot: ({ data }) => (
+    <div><Chatbot socket={data.socket} message={data.message} /></div>
+  )
+};
 
 function Display({ nodes, edges }) {
     console.log("Display rendering with nodes:", nodes);
@@ -9,6 +16,7 @@ function Display({ nodes, edges }) {
         <ReactFlow 
             nodes={nodes}
             edges={edges}
+            nodeTypes={nodeTypes}
             // This inline function deals with specific node that have onclick in their data
             // confirm, more options, add method and edit
             onNodeClick={(event, node) => {
