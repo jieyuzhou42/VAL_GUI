@@ -67,7 +67,7 @@ function RequestUserTask({ data }) {
           </button>
         </form>
 
-        {/* 작게 도움말 */}
+        {/* Small help text */}
         <div style={styles.help}>
           Press <kbd style={styles.kbd}>Enter</kbd> to send
         </div>
