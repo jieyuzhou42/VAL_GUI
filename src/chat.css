@@ -1,234 +1,192 @@
-:root {
-    --msger-bg: #fff;
-    --border: 2px solid #ddd;
-    --left-msg-bg: #ececec;
-    --right-msg-bg: #9AA9CC;
-  }
-  
-  .chatbot-container {
-    font-family: "Helvetica Neue", "Arial", sans-serif;
-    font-weight: 450;
-    text-align: left;
-    font-size: 14px;
-  }
-  
-  /* Chat box layout */
-  .chatbot-container .msger {
-    display: flex;
-    flex-flow: column nowrap;
-    justify-content: space-between;
-    max-width: 380px;
-    margin: 20px 10px;
-    height: 550px;
-    border: var(--border);
-    border-radius: 5px;
-    background: var(--msger-bg);
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
-  }
-  
-  .chatbot-container .msger-header {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px;
-    border-bottom: var(--border);
-    background: #eee;
-    color: #666;
-  }
-  
-  .chatbot-container .msger-chat {
-    display: flex;
-    flex-flow: column nowrap;
-    padding: 10px;
-    overflow-y: auto;
-    flex: 1;
-  }
-  
-  .chatbot-container .msger-inputarea {
-    display: flex;
-    padding: 10px;
-    border-top: var(--border);
-    background: #eee;
-  }
-  
-  .chatbot-container .msger-input {
-    flex: 1;
-    border: 2px solid #ddd;
-    border-radius: 3px;
-    padding: 10px;
-    font-size: 14px;
-  }
-  
-  .chatbot-container .msger-send-btn {
-    margin-left: 10px;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 3px;
-    background: #333;
-    color: #fff;
-    font-size: 14px;
-    cursor: pointer;
-  }
-  
-  /* Messages */
-  .chatbot-container .msg {
-    display: flex;
-    align-items: flex-end;
-    margin-bottom: 10px;
-  }
-  
-  .chatbot-container .msg:last-of-type {
-    margin: 0;
-  }
-  
-  .chatbot-container .msg-img {
-    width: 40px;
-    height: 40px;
-    margin-right: 10px;
-    background: none;
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: cover;
-    border-radius: 50%;
-  }
-  
-  .chatbot-container .msg-bubble {
-    max-width: 200px;
-    padding: 15px;
-    border-radius: 15px;
-    background: var(--left-msg-bg);
-  }
-  
-  .chatbot-container .msg-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 5px;
-  }
-  
-  .chatbot-container .msg-info-name {
-    margin-right: 10px;
-    font-weight: bold;
-  }
-  
-  .chatbot-container .msg-info-time {
-    font-size: 0.85em;
-  }
-  
-  .chatbot-container .left-msg .msg-bubble {
-    border-bottom-left-radius: 0;
-  }
-  
-  .chatbot-container .right-msg {
-    flex-direction: row-reverse;
-  }
-  
-  .chatbot-container .right-msg .msg-bubble {
-    background: var(--right-msg-bg);
-    color: #fff;
-    border-bottom-right-radius: 0;
-  }
-  
-  .chatbot-container .right-msg .msg-img {
-    margin: 0 0 0 10px;
-  }
-  
-  /* User input style */
-  .chatbot-container .user-input {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 10px;
-  }
-  
-  .chatbot-container .user-input .msg-bubble {
-    max-width: 60%;
-    background-color: #dcf8c6;
-    padding: 10px;
-    border-radius: 10px;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-    position: relative;
-  }
-  
-  .chatbot-container .user-input .msg-info {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 5px;
-  }
-  
-  .chatbot-container .user-input .msg-info-name {
-    font-weight: bold;
-    color: #555;
-  }
-  
-  .chatbot-container .user-input .msg-text {
-    color: #333;
-    font-size: 8px;
-  }
-  
-  /* VAL output */
-  .chatbot-container .val-output {
-    display: flex;
-    justify-content: flex-start;
-    margin-bottom: 0px;
-  }
-  
-  .chatbot-container .val-output p {
-    max-width: 60%;
-    background-color: #fff;
-    padding: 10px;
-    border-radius: 10px;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-    position: relative;
-    color: #333;
-  }
-  
-  /* Buttons */
-  .chatbot-container .buttons {
-    display: flex;
-    justify-content: flex-start;
-    gap: 10px;
-    margin-top: 10px;
-  }
-  
-  .chatbot-container .buttons .yes,
-  .chatbot-container .buttons .no{
-    padding: 5px 10px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    color: #fff;
-  }
-  
-  .chatbot-container .buttons .yes{
-    background-color: #F1CE42;
-  }
-  
-  .chatbot-container .buttons .no {
-    background-color: #808080;
-  }
-  
-  .chatbot-container .options-form {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding-top: 12px;
-    border-radius: 12px;
-    font-family: "Helvetica Neue", Arial, sans-serif;
-  }
-  
-  .chatbot-container .options-form select {
-    padding: 10px 12px;
-    border: 0.5px solid #ccc;
-    border-radius: 10px;
-    background-color: white;
-    font-size: 14px;
-    font-family: inherit;
-    appearance: none;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='2' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    background-size: 12px 8px;
-    padding-right: 30px;
-  }
+/* chat.css — match RequestUserTask exactly, compact bubbles (380×550) */
+
+:root{
+  --panel-bg:#fff;
+  --panel-border:#E7EAF0;
+  --panel-shadow:0 8px 24px rgba(0,0,0,0.06);
+
+  /* bubbles */
+  --val-bubble-bg:#F9FAFD;      /* RequestUserTask description bg */
+  --val-bubble-border:#EDF1F7;
+  --me-bubble-bg:#E6E7EB;       /* same family as button tone */
+  --me-bubble-border:#D7DBE7;
+
+  /* controls */
+  --input-border:#D7DBE7;
+  --button-bg:#E6E7EB;
+
+  /* text */
+  --text:#2A2F3A;
+  --text-strong:#1F2A44;
+  --hint:#7A8293;
+
+  /* brand dot */
+  --brand-dot:rgb(132,171,249);
+}
+
+/* ✅ RequestUserTask와 동일한 폰트/굵기 */
+.chatbot-container{
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-weight:600;
+  font-size:14px;
+  text-align:left;
+}
+.chatbot-container input,
+.chatbot-container button,
+.chatbot-container select{
+  font-family:inherit;
+  font-size:inherit;
+  font-weight:inherit;
+}
+
+/* panel: 동일 카드톤 + 원래 사이즈 */
+.chatbot-container .msger{
+  display:flex; flex-flow:column nowrap; justify-content:space-between;
+  width:320px; height:480px;
+  margin:20px 10px;
+  border-radius:12px;
+  background:var(--panel-bg);
+  border:1px solid var(--panel-border);
+  box-shadow:var(--panel-shadow);
+  overflow:hidden;
+}
+
+/* header: VAL 대문자 + 브랜드 점, 구분선 없음 */
+.chatbot-container .msger-header{
+  display:flex; align-items:center; gap:8px;
+  padding:12px 16px;
+  border-bottom:none;
+  background:var(--panel-bg);
+}
+.chatbot-container .msger-header-title{
+  display:inline-flex; align-items:center; gap:8px;
+  color:var(--text-strong);
+  font-weight:700; font-size:18px;
+  text-transform:uppercase;   /* VAL -> VAL */
+}
+.chatbot-container .msger-header-title::before{
+  content:""; width:10px; height:10px; border-radius:50%; background:var(--brand-dot);
+}
+.chatbot-container .msger-header-options{ margin-left:auto; color:#98A2B3; }
+
+/* chat area: 흰 바탕, 여백을 살짝만 */
+.chatbot-container .msger-chat{
+  flex:1; display:flex; flex-direction:column;
+  gap:6px;                 /* 촘촘하게 */
+  padding:10px 12px;       /* 살짝만 */
+  background:#fff;
+  overflow-y:auto;
+}
+
+/* row & avatar: 전체 높이 작게 */
+.chatbot-container .msg{ display:flex; align-items:flex-end; gap:6px; }
+.chatbot-container .msg-img{
+  width:24px; height:24px;               /* ⬅️ 작게 */
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:cover;
+  border-radius:50%;
+}
+
+/* ⛔️ 버블 높이 커지는 원인 제거: 이름/시간 줄 전체 숨김 */
+.chatbot-container .msg-info{ display:none !important; }
+
+/* bubble 공통: 텍스트 높이에 딱 맞게 */
+.chatbot-container .msg-bubble{
+  max-width:74%;
+  padding:12px 8px;         /* ⬅️ 핵심: 아주 얕게 */
+  border-radius:10px;
+  line-height:1.35;        /* 텍스트 기준 높이 */
+  font-size:14px;
+  color:var(--text);
+  box-shadow:0 2px 6px rgba(0,0,0,0.05); /* RequestUserTask와 동일한 그림자 */
+  /* white-space:pre-wrap; */
+  /* padding: 3px 8px;     /* ⬅️ 핵심: 위아래 패딩 확 줄임 */
+  /* line-height: 1.35;    텍스트 기준으로 딱 붙게 */ 
+  /* border-radius: 10px; */
+}
+.chatbot-container .msg-text{ margin:0; }
+
+/* VAL(왼쪽) = RequestUserTask 설명 박스 그대로 */
+.chatbot-container .left-msg{ gap:6px; }
+.chatbot-container .left-msg .msg-bubble{
+  background:var(--val-bubble-bg);
+  border:1px solid var(--val-bubble-border);
+}
+
+/* Me(오른쪽) = 회색 카드 */
+.chatbot-container .right-msg{ flex-direction:row-reverse; gap:6px; }
+.chatbot-container .right-msg .msg-bubble{
+  background:var(--me-bubble-bg);
+  border:1px solid var(--me-bubble-border);
+  color:#111;
+}
+
+/* input area: 하단 힌트 포함, 구분선 없음 */
+.chatbot-container .msger-inputarea{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px 28px;   /* 힌트 공간 */
+  border-top:none;          /* 구분선 제거 */
+  background:var(--panel-bg);
+  position:relative;
+}
+.chatbot-container .msger-inputarea::after{
+  content:"Press Enter to send";  /* RequestUserTask와 동일 문구 */
+  position:absolute; right:12px; bottom:6px;
+  font-size:12px; color:var(--hint);
+  font-family:inherit; font-weight:400;  /* ⬅️ 폰트/굵기 매칭 */
+}
+.chatbot-container .msger-input{
+  flex:1; height:36px;
+  border-radius:10px;
+  border:1px solid var(--input-border);
+  padding:0 10px;
+  outline:none; background:#fff;
+  line-height:1.35;
+}
+.chatbot-container .msger-send-btn{
+  height:36px; padding:0 14px;
+  border-radius:10px;
+  border:1px solid var(--input-border);
+  background:var(--button-bg);
+  color:#111; font-weight:600; cursor:pointer;
+  transition:filter 120ms ease;
+}
+.chatbot-container .msger-send-btn:hover{ filter:brightness(0.97); }
+.chatbot-container .msger-send-btn:active{ filter:brightness(0.95); }
+
+/* yes/no 버튼도 카드 톤 유지(필요시) */
+.chatbot-container .buttons{ display:flex; gap:8px; margin-top:6px; }
+.chatbot-container .buttons .yes,
+.chatbot-container .buttons .no{
+  padding:4px 10px; border-radius:8px;
+  border:1px solid var(--input-border);
+  background:var(--button-bg);
+  color:#111; font-weight:600; cursor:pointer;
+}
+.chatbot-container .buttons .yes:hover,
+.chatbot-container .buttons .no:hover{ filter:brightness(0.97); }
+
+/* 옵션 select */
+.chatbot-container .options-form{ display:flex; flex-direction:column; gap:8px; padding-top:6px; }
+.chatbot-container .options-form select{
+  padding:8px 10px; border:1px solid var(--input-border); border-radius:10px;
+  background:#fff; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.06);
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center; background-size:12px 8px;
+  padding-right:28px;
+}
+
+/* legacy */
+.chatbot-container .val-output p{
+  background:var(--val-bubble-bg);
+  border:1px solid var(--val-bubble-border);
+  border-radius:10px;
+  padding:8px 10px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
+  color:var(--text);
+}
+
+/* 메시지 컨테이너 */
+#prompt-message{ display:flex; flex-direction:column; gap:6px; }
