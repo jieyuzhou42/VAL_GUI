@@ -32,7 +32,7 @@ function RequestUserTask({ data }) {
           <h2 style={styles.title}>VAL</h2>
         </div>
 
-        {/* 안내/설명 영역 */}
+        {/* Guide/description area */}
         {data && (
           <div style={styles.description}>
             {typeof data === "string" ? data : JSON.stringify(data)}
