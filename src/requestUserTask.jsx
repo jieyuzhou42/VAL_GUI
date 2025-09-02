@@ -106,7 +106,7 @@ const styles = {
     width: 10,
     height: 10,
     borderRadius: "50%",
-    background: "rgb(132, 171, 249)", // 다른 화면에서 쓰는 블루 톤과 맞춤
+    background: "rgb(132, 171, 249)", // Blue tone matching other screens
   },
   title: {
     margin: 0,
