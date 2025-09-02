@@ -76,7 +76,7 @@ function RequestUserTask({ data }) {
   );
 }
 
-/** 인라인 스타일: 앱의 기본 톤(밝은 배경, 깔끔한 카드, 은은한 그림자)에 맞춤 */
+/** Inline styles: matched to app's base tone (light background, clean cards, subtle shadows) */
 const styles = {
   page: {
     width: "100%",
