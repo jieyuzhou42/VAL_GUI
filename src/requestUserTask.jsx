@@ -39,7 +39,7 @@ function RequestUserTask({ data }) {
           </div>
         )}
 
-        {/* 입력 영역 */}
+        {/* Input area */}
         <form
           style={styles.form}
           onSubmit={(e) => {
