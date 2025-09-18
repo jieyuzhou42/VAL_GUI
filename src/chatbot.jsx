@@ -44,7 +44,10 @@ function Chatbot({ socket, message }) {
         message['type'] === 'display_known_tasks' ||
         message['type'] === 'request_user_task' ||
         message['type'] === 'ask_subtasks' ||
-        message['type'] === 'ask_rephrase'
+        message['type'] === 'ask_rephrase' ||
+        message['type'] === 'display_decomposition_analysis' ||
+        message['type'] === 'display_method_creation' ||
+        message['type'] === 'display_edit_options'
       ) {
         buildDialog(message);
       } else if (
@@ -94,7 +97,43 @@ function Chatbot({ socket, message }) {
   }
 
   function buildDialog(data) {
-    appendMessage("VAL", valPic, "left", data['text']);
+    let displayText = data['text'];
+    
+    // Enhanced formatting for different message types
+    if (data['type'] === 'display_decomposition_analysis') {
+      displayText = formatAnalysisText(data['text']);
+    } else if (data['type'] === 'display_method_creation') {
+      displayText = formatMethodCreationText(data['text']);
+    } else if (data['type'] === 'display_edit_options') {
+      displayText = formatEditOptionsText(data['text']);
+    }
+    
+    appendMessage("VAL", valPic, "left", displayText);
+  }
+
+  function formatAnalysisText(text) {
+    // Convert markdown-style formatting to HTML
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`(.*?)`/g, '<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px;">$1</code>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+  }
+
+  function formatMethodCreationText(text) {
+    // Convert markdown-style formatting to HTML
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`(.*?)`/g, '<code style="background: #e8f4f8; padding: 2px 4px; border-radius: 3px;">$1</code>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+  }
+
+  function formatEditOptionsText(text) {
+    // Format edit options with better structure
+    return text
+      .replace(/Option \d+:/g, '<br><strong>$&</strong>')
+      .replace(/\n/g, '<br>');
   }
 
   function confirmation(data) {
