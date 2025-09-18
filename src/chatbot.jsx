@@ -64,6 +64,7 @@ function Chatbot({ socket, message }) {
       else if (message['type'] === 'map_correction'){correction(message,'map');}
       else if (message['type'] === 'ground_correction'){correction(message,'ground');}
       else if (message['type'] === 'gen_correction') {correction(message, 'ground');}
+      else if (message['type'] === 'correct_grounding') {correctGrounding(message);}
     }
   }, [message]);
 
@@ -199,6 +200,119 @@ function Chatbot({ socket, message }) {
 
     form.appendChild(submitButton);
     dialog.appendChild(form);
+    appendMessage("VAL", valPic, "left", data['text'], null, dialog);
+  }
+
+  function correctGrounding(data) {
+    const dialog = document.createElement('div');
+    dialog.className = 'chatbot-container val-output';
+
+    const form = document.createElement('form');
+    form.className = 'grounding-correction-form';
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+    });
+
+    // Create action selection
+    const actionLabel = document.createElement('label');
+    actionLabel.textContent = 'Action:';
+    actionLabel.style.display = 'block';
+    actionLabel.style.marginBottom = '5px';
+    actionLabel.style.fontWeight = 'bold';
+
+    const actionSelect = document.createElement('select');
+    actionSelect.name = 'action-select';
+    actionSelect.style.width = '100%';
+    actionSelect.style.padding = '8px';
+    actionSelect.style.marginBottom = '15px';
+    actionSelect.style.border = '1px solid #ccc';
+    actionSelect.style.borderRadius = '4px';
+
+    // Add current action as default option
+    const currentActionOption = document.createElement('option');
+    currentActionOption.value = data['current_action'];
+    currentActionOption.textContent = data['current_action'] + ' (current)';
+    currentActionOption.selected = true;
+    actionSelect.appendChild(currentActionOption);
+
+    // Add other common actions
+    const commonActions = ['pick', 'place', 'cook', 'cut', 'pour', 'mix', 'serve', 'open', 'close'];
+    commonActions.forEach(action => {
+      if (action !== data['current_action']) {
+        const option = document.createElement('option');
+        option.value = action;
+        option.textContent = action;
+        actionSelect.appendChild(option);
+      }
+    });
+
+    // Create objects selection
+    const objectsLabel = document.createElement('label');
+    objectsLabel.textContent = 'Objects (select multiple):';
+    objectsLabel.style.display = 'block';
+    objectsLabel.style.marginBottom = '5px';
+    objectsLabel.style.fontWeight = 'bold';
+
+    const objectsSelect = document.createElement('select');
+    objectsSelect.name = 'objects-select';
+    objectsSelect.multiple = true;
+    objectsSelect.style.width = '100%';
+    objectsSelect.style.padding = '8px';
+    objectsSelect.style.marginBottom = '15px';
+    objectsSelect.style.border = '1px solid #ccc';
+    objectsSelect.style.borderRadius = '4px';
+    objectsSelect.style.height = '120px';
+
+    // Add available objects
+    data['available_objects'].forEach((obj, index) => {
+      const option = document.createElement('option');
+      option.value = obj;
+      option.textContent = obj;
+      
+      // Pre-select current objects
+      if (data['current_objects'].includes(obj)) {
+        option.selected = true;
+      }
+      
+      objectsSelect.appendChild(option);
+    });
+
+    // Create submit button
+    const submitButton = document.createElement('button');
+    submitButton.className = 'chatbot-container buttons';
+    submitButton.textContent = 'Submit Correction';
+    submitButton.style.width = '100%';
+    submitButton.style.padding = '10px';
+    submitButton.style.backgroundColor = '#007bff';
+    submitButton.style.color = 'white';
+    submitButton.style.border = 'none';
+    submitButton.style.borderRadius = '4px';
+    submitButton.style.cursor = 'pointer';
+    
+    submitButton.onclick = () => {
+      const selectedAction = actionSelect.value;
+      const selectedObjects = Array.from(objectsSelect.selectedOptions).map(option => option.value);
+      
+      // Format response as "action:object1,object2"
+      const response = `${selectedAction}:${selectedObjects.join(',')}`;
+      
+      socket.emit('message', {
+        type: "correct_grounding_response", 
+        response: response 
+      });
+      
+      // Show user's selection in chat
+      appendMessage("Me", userPic, "right", `Corrected to: ${selectedAction} -> ${selectedObjects.join(', ')}`);
+    };
+
+    // Assemble form
+    form.appendChild(actionLabel);
+    form.appendChild(actionSelect);
+    form.appendChild(objectsLabel);
+    form.appendChild(objectsSelect);
+    form.appendChild(submitButton);
+    dialog.appendChild(form);
+    
     appendMessage("VAL", valPic, "left", data['text'], null, dialog);
   }
 

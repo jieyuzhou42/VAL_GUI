@@ -260,9 +260,9 @@ useEffect(() => {
           x: yesNode.position.x + 150, 
           y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
         },
-        data: { label: task.Task },
+        data: { label: task.task_name },
         // debugging
-        // data: {label: `${task.hash}-${task.Task}`},
+        // data: {label: `${task.hash}-${task.task_name}`},
         _style: {
           background: currentNodeColor,
           border: 'none',
@@ -385,7 +385,7 @@ useEffect(() => {
           position: { 
             x: parentNode.position.x + 400, 
             y: parentNode.position.y + idx * 100 + i * 50 },
-          data: { label: task.Task }, 
+          data: { label: task.task_name }, 
           style: { background: currentNodeColor, border: 'none' },
           sourcePosition: 'right', targetPosition: 'left' };
 
@@ -732,7 +732,7 @@ useEffect(() => {
       const newNode = {
         id: task.hash,
         position: { x: 0, y: 0 }, // Default position
-        data: { label: task.Task, dropdown1: "Default Option 1", dropdown2: "Default Choice A" },
+        data: { label: task.task_name, dropdown1: "Default Option 1", dropdown2: "Default Choice A" },
         style: { background: currentNodeColor, border: 'none' },
         sourcePosition: 'right',
         targetPosition: 'left',
