@@ -159,7 +159,7 @@ useEffect(() => {
 
     // if there is no subtask just update the highlighted path and return
     if (data.subtasks.length === 0) {
-      socket.emit("message", { type: 'response_decomposition', response:0 });
+      socket.emit("message", {type: 'response_decomposition_with_edit', response: {user_choice: 'add_method'}});
       console.log("User confirmed decomposition with no subtask");
       onConfirm(null);
       return;
@@ -455,7 +455,8 @@ useEffect(() => {
 
   // every confirsmation step has confirm, more options, add method and edit as options
   const handleConfirm = (yesNode, index, parentNode) => {
-    socket.emit("message", { type: 'response_decomposition', response: index });
+    socket.emit("message", {type: 'response_decomposition_with_edit', 
+                            response: {user_choice: 'approve', index: index}});
     console.log("User confirmed decomposition");
 
     let nodesToRemove = new Set();
@@ -713,11 +714,8 @@ useEffect(() => {
     const addMethodNode = nodesRef.current.find(n => n.id === 'add method');
     const position = addMethodNode?.position || { x: 50, y: 50 };
   
-    socket.emit("message", {
-      type: 'response_decomposition',
-      response: "add method",
-      position,  // include position
-    });
+    socket.emit("message", {type: 'response_decomposition_with_edit', 
+                           response: {user_choice: 'add_method'}});
     onConfirm(null);
   };
 
