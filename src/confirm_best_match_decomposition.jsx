@@ -260,7 +260,7 @@ useEffect(() => {
           x: yesNode.position.x + 150, 
           y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
         },
-        data: { label: task.task_name },
+        data: { label: `${task.task_name} ${task.args}` },
         // debugging
         // data: {label: `${task.hash}-${task.task_name}`},
         _style: {
