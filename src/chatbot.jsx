@@ -52,19 +52,13 @@ function Chatbot({ socket, message }) {
         buildDialog(message);
       } else if (
         message['type'] === 'segment_confirmation' ||
-        message['type'] === 'map_confirmation' ||
-        message['type'] === 'map_new_method_confirmation' ||
-        message['type'] === 'ground_confirmation' ||
-        message['type'] === 'gen_confirmation' ||
-        message['type'] === 'confirm_task_decomposition' ||
-        message['type'] === 'confirm_task_execution'
+        message['type'] === 'confirm_task_decomposition' 
       ) {
         confirmation(message);
       } 
-      else if (message['type'] === 'map_correction'){correction(message,'map');}
-      else if (message['type'] === 'ground_correction'){correction(message,'ground');}
-      else if (message['type'] === 'gen_correction') {correction(message, 'ground');}
-      else if (message['type'] === 'correct_grounding') {correctGrounding(message);}
+      else if (message['type'] === 'correct_grounding') {
+        correctGrounding(message);
+      }
     }
   }, [message]);
 
@@ -163,45 +157,6 @@ function Chatbot({ socket, message }) {
     appendMessage("VAL", valPic, "left", data['text'], buttonsDiv);
   }
 
-  function correction(data,type) {
-    const container = document.getElementById('prompt-message');
-    let known_tasks = [];
-    if (type === 'map') {known_tasks = data['known_tasks'];}
-    if (type === 'ground') {known_tasks = data['env_objects'];}
-
-    const dialog = document.createElement('div');
-    dialog.className = 'chatbot-container val-output';
-
-    const form = document.createElement('form');
-    form.className = 'options-form';
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-    });
-
-    const select = document.createElement('select');
-    select.name = 'task-options';
-
-    known_tasks.forEach((task, index) => {
-      const option = document.createElement('option');
-      option.value = index;
-      option.textContent = task;
-      select.appendChild(option);
-    });
-
-    form.appendChild(select);
-
-    const submitButton = document.createElement('button');
-    submitButton.className = 'chatbot-container buttons';
-    submitButton.textContent = 'Submit';
-    submitButton.onclick = () => {
-      const selectedOption = select.value;
-      socket.emit('message', {type:"confirm_response", response: selectedOption });
-    };
-
-    form.appendChild(submitButton);
-    dialog.appendChild(form);
-    appendMessage("VAL", valPic, "left", data['text'], null, dialog);
-  }
 
   function correctGrounding(data) {
     const dialog = document.createElement('div');
@@ -314,12 +269,6 @@ function Chatbot({ socket, message }) {
     dialog.appendChild(form);
     
     appendMessage("VAL", valPic, "left", data['text'], null, dialog);
-  }
-
-  function formatDate(date) {
-    const h = "0" + date.getHours();
-    const m = "0" + date.getMinutes();
-    return `${h.slice(-2)}:${m.slice(-2)}`;
   }
 
   return (

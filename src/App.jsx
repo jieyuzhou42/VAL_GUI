@@ -8,7 +8,9 @@ import Chatbot from './chatbot';
 import DisplayAddedMethod from './DisplayAddedMethod';
 import './App.css';
 
-const socket = io(); 
+const socket = io('http://localhost:4002', {
+  transports: ['websocket', 'polling']
+}); 
 function App () {
   const [message, setMessage] = useState(null);
   const [showChatbot, setShowChatbot] = useState(false);

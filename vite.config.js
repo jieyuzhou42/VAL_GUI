@@ -10,6 +10,7 @@ export default defineConfig({
         target: 'http://localhost:4002', // Forward all /socket.io requests to backend server at port 4002
         ws: true,  // Enable websocket proxying
         changeOrigin: true, // Change the origin of the host header to the target URL
+        secure: false, // Allow insecure connections for development
       }
     }
   }

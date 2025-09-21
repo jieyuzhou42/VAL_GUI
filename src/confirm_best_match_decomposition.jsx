@@ -260,7 +260,12 @@ useEffect(() => {
           x: yesNode.position.x + 150, 
           y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
         },
-        data: { label: `${task.task_name} ${task.args}` },
+        data: { 
+          label: `${task.task_name} ${task.args}`,
+          task_name: task.task_name,
+          args: task.args,
+          hash: task.hash
+        },
         // debugging
         // data: {label: `${task.hash}-${task.task_name}`},
         _style: {
@@ -385,7 +390,12 @@ useEffect(() => {
           position: { 
             x: parentNode.position.x + 400, 
             y: parentNode.position.y + idx * 100 + i * 50 },
-          data: { label: task.task_name }, 
+          data: { 
+            label: task.task_name,
+            task_name: task.task_name,
+            args: task.args,
+            hash: task.hash
+          }, 
           style: { background: currentNodeColor, border: 'none' },
           sourcePosition: 'right', targetPosition: 'left' };
 
@@ -719,18 +729,25 @@ useEffect(() => {
     onConfirm(null);
   };
 
-  const dropdownOptions1 = ["boil", "wait", "get", "go", "interact", "put"];
-  const dropdownOptions2 = ["dish", "onion", "pot"];  
+  const dropdownOptions1 = data.available_actions || [];
+  const dropdownOptions2 = data.env_objects || [];  
   
   const handleEditClick = (task) => {
     const taskNode = nodesRef.current.find((node) => node.id === task.hash);
-  
+
     if (!taskNode) {
       console.warn(`Node with id ${task.hash} does not exist. Creating a new node.`);
       const newNode = {
         id: task.hash,
         position: { x: 0, y: 0 }, // Default position
-        data: { label: task.task_name, dropdown1: "Default Option 1", dropdown2: "Default Choice A" },
+        data: { 
+          label: task.task_name,
+          task_name: task.task_name,
+          args: task.args,
+          hash: task.hash,
+          dropdown1: task.task_name,
+          dropdown2: task.args.length > 0 ? task.args[0] : ""
+        },
         style: { background: currentNodeColor, border: 'none' },
         sourcePosition: 'right',
         targetPosition: 'left',
@@ -738,9 +755,11 @@ useEffect(() => {
       setNodes((prevNodes) => [...prevNodes, newNode]);
       return;
     }
-  
+
     const position = taskNode.position || { x: 0, y: 0 }; // Fallback position
-  
+    const currentTaskName = taskNode.data.task_name || task.task_name;
+    const currentArgs = taskNode.data.args || task.args;
+
     setNodes((prevNodes) =>
       prevNodes.map((node) =>
         node.id === task.hash
@@ -751,7 +770,7 @@ useEffect(() => {
                 label: (
                   <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                     <select
-                      defaultValue={node.data.dropdown1 || "Default Option 1"}
+                      defaultValue={currentTaskName}
                       onChange={(e) => handleNodeEditChange(e, task.hash, 'dropdown1')}
                       style={{
                         width: '100px',
@@ -767,7 +786,7 @@ useEffect(() => {
                       ))}
                     </select>
                     <select
-                      defaultValue={node.data.dropdown2 || "Default Choice A"}
+                      defaultValue={currentArgs.length > 0 ? currentArgs[0] : ""}
                       onChange={(e) => handleNodeEditChange(e, task.hash, 'dropdown2')}
                       style={{
                         width: '100px',
@@ -776,6 +795,7 @@ useEffect(() => {
                         textAlign: 'center',
                       }}
                     >
+                      <option value="">No object</option>
                       {dropdownOptions2.map((option, index) => (
                         <option key={index} value={option}>
                           {option}
@@ -784,8 +804,8 @@ useEffect(() => {
                     </select>
                   </div>
                 ),
-                dropdown1: node.data.dropdown1 || "Default Option 1", // Retain dropdown1
-                dropdown2: node.data.dropdown2 || "Default Choice A", // Retain dropdown2
+                dropdown1: currentTaskName, // Use current task_name as default
+                dropdown2: currentArgs.length > 0 ? currentArgs[0] : "", // Use current args as default
               },
             }
           : node
@@ -846,6 +866,7 @@ useEffect(() => {
 
   const handleNodeEditChange = (event, nodeId, dropdown) => {
     const newValue = event.target.value;
+    console.log(`Updating ${dropdown} for node ${nodeId} to:`, newValue);
   
     setNodes((prevNodes) => {
       const nodeExists = prevNodes.some((node) => node.id === nodeId);
@@ -868,11 +889,19 @@ useEffect(() => {
   
       // Explicitly update nodesRef
       nodesRef.current = updatedNodes;
+      
+      // Debug: log the updated node data
+      const updatedNode = updatedNodes.find(node => node.id === nodeId);
+      console.log('Updated node data:', updatedNode?.data);
+      
       return updatedNodes;
     });
   };
 
   const handleConfirmEdit = (nodeId) => {
+    console.log('Confirming edit for node:', nodeId);
+    console.log('Available nodes in nodesRef.current:', nodesRef.current.map(n => ({ id: n.id, data: n.data })));
+    
     // Remove the confirm button and the trash button
     setNodes((prevNodes) =>
       prevNodes.filter(
@@ -880,13 +909,59 @@ useEffect(() => {
       )
     );
     
-    // Find the updated node
+    // Find the updated node - use nodesRef.current which is updated by handleNodeEditChange
     const updatedNode = nodesRef.current.find((node) => node.id === nodeId);
-  
+    console.log('Found updated node:', updatedNode?.data);
+
     if (updatedNode) {
-      const dropdown1Value = updatedNode.data.dropdown1 || "Default Option 1";
-      const dropdown2Value = updatedNode.data.dropdown2 || "Default Choice A";
-  
+      const dropdown1Value = updatedNode.data.dropdown1;
+      const dropdown2Value = updatedNode.data.dropdown2;
+
+      // Build the complete decomposition structure BEFORE updating the node
+      // This way we can use the current dropdown values directly
+      const editedSubtasks = data.subtasks[0].map(task => {
+        if (task.hash === nodeId) {
+          // This is the task we just edited, use the dropdown values
+          console.log(`Using edited data for ${task.hash}:`, {
+            task_name: dropdown1Value,
+            args: dropdown2Value === "" ? [] : [dropdown2Value]
+          });
+          return {
+            task_name: dropdown1Value,
+            args: dropdown2Value === "" ? [] : [dropdown2Value]
+          };
+        } else {
+          // For other tasks, check if they have been edited
+          const taskNode = nodesRef.current.find(node => node.id === task.hash);
+          console.log(`Processing task ${task.hash}:`, {
+            taskNode: taskNode?.data,
+            original: { task_name: task.task_name, args: task.args }
+          });
+          
+          if (taskNode && taskNode.data.task_name && taskNode.data.args !== undefined) {
+            // This task has been edited
+            console.log(`Using edited data for ${task.hash}:`, {
+              task_name: taskNode.data.task_name,
+              args: taskNode.data.args
+            });
+            return {
+              task_name: taskNode.data.task_name,
+              args: taskNode.data.args
+            };
+          } else {
+            // This task hasn't been edited, use original data
+            console.log(`Using original data for ${task.hash}:`, {
+              task_name: task.task_name,
+              args: task.args
+            });
+            return {
+              task_name: task.task_name,
+              args: task.args
+            };
+          }
+        }
+      });
+
       // Update the node to return to its original interface
       setNodes((prevNodes) =>
         prevNodes.map((node) =>
@@ -895,25 +970,32 @@ useEffect(() => {
                 ...node,
                 data: {
                   ...node.data,
-                  label: `${dropdown1Value} ${dropdown2Value}`, // Combine dropdown values as the new label
-                  dropdown1: dropdown1Value, // Retain dropdown1
-                  dropdown2: dropdown2Value, // Retain dropdown2
+                  task_name: dropdown1Value,
+                  args: dropdown2Value === "" ? [] : [dropdown2Value],
+                  label: dropdown2Value === "" ? `${dropdown1Value}` : `${dropdown1Value} ${dropdown2Value}`,
+                  dropdown1: dropdown1Value,
+                  dropdown2: dropdown2Value,
                 },
               }
             : node
         )
       );
-  
-      // Send the selected values to the server
+
+      // Send the complete decomposition structure
       socket.emit("message", {
-        type: 'edit_decomposition',
-        response: { dropdown1: dropdown1Value, dropdown2: dropdown2Value },
+        type: 'response_decomposition_with_edit',
+        response: {
+          user_choice: "gui_edit",
+          edited_decomposition: {
+            head: data.head,
+            subtasks: [editedSubtasks]
+          }
+        }
       });
     } else {
       console.error(`Node with id ${nodeId} not found.`);
     }
   };
-
   const handleTrashClick = (nodeId) => {
     // Remove the node and its associated buttons (trash, confirm, edit)
     setNodes((prevNodes) =>
@@ -928,7 +1010,7 @@ useEffect(() => {
     
     // Send a message to the server
     socket.emit("message", {
-      type: 'edit_decomposition'
+      type: 'response_decomposition_with_edit'
     });
   };
 }
