@@ -471,16 +471,25 @@ useEffect(() => {
       return taskNode && taskNode.data.isEdited === true;
     });
 
-    if (hasEditedSubtasks) {
+    // Also check if there are newly added subtasks in the UI
+    const hasNewSubtasks = nodesRef.current.some(
+      (node) => node.id.startsWith(`${data.head.hash}-new-`)
+    );
+
+    if (hasEditedSubtasks || hasNewSubtasks) {
       // If there are edits, call handleConfirmEdit for the first edited task
       // handleConfirmEdit will handle all edits
       const firstEditedTask = data.subtasks[0].find(task => {
         const taskNode = nodesRef.current.find(node => node.id === task.hash);
         return taskNode && taskNode.data.isEdited === true;
       });
+      // If there is no edited original task, pick the first newly added one
+      const firstNewTaskId = !firstEditedTask
+        ? (nodesRef.current.find(n => n.id.startsWith(`${data.head.hash}-new-`))?.id)
+        : undefined;
       
-      if (firstEditedTask) {
-        handleConfirmEdit(firstEditedTask.hash);
+      if (firstEditedTask || firstNewTaskId) {
+        handleConfirmEdit(firstEditedTask ? firstEditedTask.hash : firstNewTaskId);
         return; // Exit early, handleConfirmEdit will handle the rest
       }
     }
@@ -859,6 +868,179 @@ useEffect(() => {
     };
   
     setNodes((prevNodes) => [...prevNodes, trashButtonNode]);
+
+    // Add-node button next to the trash button
+    const addButtonNode = {
+      id: `${task.hash}-add`,
+      position: {
+        x: position.x + 180,
+        y: position.y + 30,
+      },
+      data: {
+        label: '+',
+        onClick: () => handleAddNode(task),
+      },
+      style: {
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+
+    setNodes((prevNodes) => [...prevNodes, addButtonNode]);
+  };
+
+  // Add a new editable subtask node under the given task
+  const handleAddNode = (task) => {
+    const anchorNode = nodesRef.current.find((node) => node.id === task.hash);
+    const anchorPos = anchorNode?.position || { x: 0, y: 0 };
+    const newId = `${data.head.hash}-new-${Date.now()}`;
+
+    // Try to find the yes node that connects to this task, so we can attach the new edge
+    const yesEdge = edgesRef.current.find(e => e.target === task.hash);
+    const yesNodeId = yesEdge ? yesEdge.source : undefined;
+
+    const defaultTaskName = (dropdownOptions1 && dropdownOptions1[0]) || '';
+    const defaultArg = '';
+
+    // Determine vertical placement: insert directly below the clicked node (anchor)
+    const VERTICAL_SPACING = 50;
+    let baseX = anchorPos.x;
+    let baseY = anchorPos.y + VERTICAL_SPACING; // default: just under anchor
+    let siblingIdsToShift = [];
+    if (yesNodeId) {
+      const childIds = edgesRef.current.filter(e => e.source === yesNodeId).map(e => e.target);
+      const childNodes = childIds
+        .map(id => nodesRef.current.find(n => n.id === id))
+        .filter(Boolean)
+        .sort((a, b) => (a.position?.y || 0) - (b.position?.y || 0));
+
+      // Keep X aligned with anchor; baseY right below anchor
+      baseX = anchorPos.x;
+      baseY = anchorPos.y + VERTICAL_SPACING;
+
+      // Determine which siblings are below or at the insertion point; shift them down to avoid overlap
+      siblingIdsToShift = childNodes
+        .filter(n => (n.id !== task.hash) && ((n.position?.y || 0) >= baseY - 1))
+        .map(n => n.id);
+    }
+
+    const newNode = {
+      id: newId,
+      position: { x: baseX, y: baseY },
+      data: {
+        label: (
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <select
+              defaultValue={defaultTaskName}
+              onChange={(e) => handleNodeEditChange(e, newId, 'dropdown1')}
+              style={{
+                width: '100px',
+                border: '1px solid black',
+                background: 'white',
+                textAlign: 'center',
+              }}
+            >
+              {dropdownOptions1.map((option, index) => (
+                <option key={index} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <select
+              defaultValue={defaultArg}
+              onChange={(e) => handleNodeEditChange(e, newId, 'dropdown2')}
+              style={{
+                width: '100px',
+                border: '1px solid black',
+                background: 'white',
+                textAlign: 'center',
+              }}
+            >
+              <option value="">No object</option>
+              {dropdownOptions2.map((option, index) => (
+                <option key={index} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+        ),
+        dropdown1: defaultTaskName,
+        dropdown2: defaultArg,
+        task_name: defaultTaskName,
+        args: defaultArg === '' ? [] : [defaultArg],
+        isEdited: true,
+        isNew: true,
+      },
+      style: { background: currentNodeColor, border: 'none' },
+      sourcePosition: 'right',
+      targetPosition: 'left',
+    };
+
+    // Add the new node, and shift following siblings down by spacing if needed
+    setNodes((prev) => {
+      const shifted = prev.map(n => {
+        if (siblingIdsToShift.includes(n.id)) {
+          return { ...n, position: { x: n.position.x, y: (n.position.y || 0) + VERTICAL_SPACING } };
+        }
+        return n;
+      });
+      return [...shifted, newNode];
+    });
+
+    // Create an edge from the yes node to this new subtask, if we could infer the yes node
+    if (yesNodeId) {
+      const edgeId = `e-${yesNodeId}-${newId}`;
+      setEdges(prev => prev.some(e => e.id === edgeId)
+        ? prev
+        : [
+            ...prev,
+            {
+              id: edgeId,
+              source: yesNodeId,
+              target: newId,
+              markerEnd: { type: MarkerType.Arrow, strokeWidth: 2, color: currentEdgeColor },
+              style: { strokeWidth: 2, stroke: currentEdgeColor },
+            },
+          ]
+      );
+    }
+
+    // Add a trash button for the new node
+    const newTrashButtonNode = {
+      id: `${newId}-trash`,
+      position: { x: baseX + 155, y: baseY + 30 },
+      data: { label: '🗑', onClick: () => handleTrashClick(newId) },
+      style: {
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+    setNodes((prev) => {
+      const shifted = prev.map(n => {
+        if (siblingIdsToShift.includes(n.id)) {
+          return { ...n, position: { x: n.position.x, y: (n.position.y || 0) + VERTICAL_SPACING } };
+        }
+        return n;
+      });
+      return [...shifted, newTrashButtonNode];
+    });
   };
 
   const handleNodeEditChange = (event, nodeId, dropdown) => {
@@ -917,28 +1099,60 @@ useEffect(() => {
     );
     
     // Build the complete decomposition structure from current node data
-    // Filter out deleted tasks (tasks that don't exist in nodesRef.current)
-    const editedSubtasks = data.subtasks[0]
-      .filter(task => {
-        // Only include tasks that still exist in the current nodes
-        return nodesRef.current.some(node => node.id === task.hash);
-      })
-      .map(task => {
-        const taskNode = nodesRef.current.find(node => node.id === task.hash);
-        if (taskNode && taskNode.data.isEdited === true) {
-          // This task has been edited, use the current node data
-          return {
-            task_name: taskNode.data.task_name,
-            args: taskNode.data.args
-          };
-        } else {
-          // This task hasn't been edited, use original data
-          return {
-            task_name: task.task_name,
-            args: task.args
-          };
+    // Determine the yes node for the edited/new node, then read all children of that yes node
+    const yesEdge = edgesRef.current.find((e) => e.target === nodeId);
+    const yesNodeId = yesEdge ? yesEdge.source : undefined;
+
+    let editedSubtasks = [];
+    if (yesNodeId) {
+      // Collect all child node ids connected from this yes node
+      const childIds = edgesRef.current
+        .filter((e) => e.source === yesNodeId)
+        .map((e) => e.target);
+
+      // Map ids to actual nodes still present in UI and sort by vertical position (top -> bottom)
+      const childNodes = childIds
+        .map((id) => nodesRef.current.find((n) => n.id === id))
+        .filter(Boolean)
+        .sort((a, b) => (a.position?.y || 0) - (b.position?.y || 0));
+
+      // Fast lookup for original backend tasks by hash
+      const originalByHash = new Map(
+        (data.subtasks[0] || []).map((t) => [t.hash, t])
+      );
+
+      editedSubtasks = childNodes.map((node) => {
+        const isNew = node.id.startsWith(`${data.head.hash}-new-`);
+        if (isNew) {
+          return { task_name: node.data.task_name, args: node.data.args };
         }
+        // Existing task: prefer edited values if present, otherwise fallback to original
+        const orig = originalByHash.get(node.id);
+        if (node.data && node.data.isEdited === true) {
+          return { task_name: node.data.task_name, args: node.data.args };
+        }
+        if (orig) {
+          return { task_name: orig.task_name, args: orig.args };
+        }
+        // Fallback if not found in original list
+        return { task_name: node.data.task_name, args: node.data.args };
       });
+    } else {
+      // Fallback: preserve previous behavior when we cannot resolve yes node
+      const existingTasks = data.subtasks[0]
+        .filter((task) => nodesRef.current.some((node) => node.id === task.hash))
+        .map((task) => {
+          const taskNode = nodesRef.current.find((node) => node.id === task.hash);
+          if (taskNode && taskNode.data.isEdited === true) {
+            return { task_name: taskNode.data.task_name, args: taskNode.data.args };
+          }
+          return { task_name: task.task_name, args: task.args };
+        });
+      const newTasks = nodesRef.current
+        .filter((node) => node.id.startsWith(`${data.head.hash}-new-`))
+        .map((node) => ({ task_name: node.data.task_name, args: node.data.args }));
+      editedSubtasks = [...existingTasks, ...newTasks];
+    }
 
     // Send the complete decomposition structure
     socket.emit("message", {
@@ -952,23 +1166,30 @@ useEffect(() => {
       }
     });
 
-    // Reset edit state for all nodes after sending the data
+    // Reset edit state and clean up edit UI for all nodes after sending the data
     setNodes((prevNodes) =>
-      prevNodes.map((node) => {
-        // Only reset nodes that have been edited
-        if (node.data.isEdited === true) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              // Keep the current values but remove the edit marker
-              // The node will now show the updated values but won't be considered "edited"
-              isEdited: false,
-            }
-          };
-        }
-        return node;
-      })
+      prevNodes
+        .filter((node) => !node.id.endsWith('-trash') && !node.id.endsWith('-add') && !node.id.endsWith('-confirm'))
+        .map((node) => {
+          if (node.data && node.data.label && typeof node.data.label !== 'string') {
+            // Convert interactive label back to plain text
+            const taskName = node.data.task_name || '';
+            const argStr = node.data.args && node.data.args.length > 0 ? ` ${node.data.args[0]}` : '';
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                label: `${taskName}${argStr}`,
+                isEdited: false,
+              },
+            };
+          }
+          // Ensure isEdited reset for others
+          if (node.data && node.data.isEdited) {
+            return { ...node, data: { ...node.data, isEdited: false } };
+          }
+          return node;
+        })
     );
   };
 
@@ -983,7 +1204,8 @@ useEffect(() => {
           node.id !== `${nodeId}-edit` // Remove the edit button
       )
     );
-    
+    // Also remove any edges that target this node
+    setEdges(prev => prev.filter(e => e.target !== nodeId && e.source !== nodeId));
   };
 }
 
