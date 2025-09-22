@@ -415,7 +415,7 @@ useEffect(() => {
       id: 'add method',
       position: { x: parentNode.position.x + 200, 
         y: parentNode.position.y + (data.subtasks.length-2)*100 +50},
-      data: { label: '+ Create Method', onClick: handleAddMethod },
+      data: { label: '+ Create Subtasks', onClick: handleAddMethod },
       style: {
         width: '100px',
         background: moreNodeColor,
@@ -465,6 +465,27 @@ useEffect(() => {
 
   // every confirsmation step has confirm, more options, add method and edit as options
   const handleConfirm = (yesNode, index, parentNode) => {
+    // Check if any subtasks have been edited
+    const hasEditedSubtasks = data.subtasks[0].some(task => {
+      const taskNode = nodesRef.current.find(node => node.id === task.hash);
+      return taskNode && taskNode.data.isEdited === true;
+    });
+
+    if (hasEditedSubtasks) {
+      // If there are edits, call handleConfirmEdit for the first edited task
+      // handleConfirmEdit will handle all edits
+      const firstEditedTask = data.subtasks[0].find(task => {
+        const taskNode = nodesRef.current.find(node => node.id === task.hash);
+        return taskNode && taskNode.data.isEdited === true;
+      });
+      
+      if (firstEditedTask) {
+        handleConfirmEdit(firstEditedTask.hash);
+        return; // Exit early, handleConfirmEdit will handle the rest
+      }
+    }
+
+    // Original logic for no edits
     socket.emit("message", {type: 'response_decomposition_with_edit', 
                             response: {user_choice: 'approve', index: index}});
     console.log("User confirmed decomposition");
@@ -812,36 +833,12 @@ useEffect(() => {
       )
     );
   
-    const confirmButtonNode = {
-      id: `${task.hash}-confirm`,
-      position: {
-        x: position.x + 155, // Same x position as the edit button
-        y: position.y + 60, // Slightly below the edit button
-      },
-      data: {
-        label: '✔',
-        onClick: () => handleConfirmEdit(task.hash),
-      },
-      style: {
-        background: 'none',
-        width: '20px',
-        height: '20px',
-        borderRadius: 'none',
-        border: '1px solid black',
-        fontSize: '10px',
-        textAlign: 'center',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-      },
-    };
-
     // Trash button node
     const trashButtonNode = {
       id: `${task.hash}-trash`,
       position: {
-        x: position.x + 155, // Position next to the confirm button
-        y: position.y + 30, // Same vertical alignment as the confirm button
+        x: position.x + 155, // Position next to the edit button
+        y: position.y + 30, // Same vertical alignment as the edit button
       },
       data: {
         label: '🗑',
@@ -861,7 +858,7 @@ useEffect(() => {
       },
     };
   
-    setNodes((prevNodes) => [...prevNodes, confirmButtonNode, trashButtonNode]);
+    setNodes((prevNodes) => [...prevNodes, trashButtonNode]);
   };
 
   const handleNodeEditChange = (event, nodeId, dropdown) => {
@@ -875,17 +872,29 @@ useEffect(() => {
         return prevNodes;
       }
   
-      const updatedNodes = prevNodes.map((node) =>
-        node.id === nodeId
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                [dropdown]: newValue, // Update the specific dropdown value
-              },
-            }
-          : node
-      );
+      const updatedNodes = prevNodes.map((node) => {
+        if (node.id === nodeId) {
+          const updatedData = {
+            ...node.data,
+            [dropdown]: newValue, // Update the specific dropdown value
+          };
+          
+          // Update task_name and args based on dropdown values
+          const dropdown1Value = dropdown === 'dropdown1' ? newValue : node.data.dropdown1;
+          const dropdown2Value = dropdown === 'dropdown2' ? newValue : node.data.dropdown2;
+          
+          updatedData.task_name = dropdown1Value;
+          updatedData.args = dropdown2Value === "" ? [] : [dropdown2Value];
+          updatedData.label = dropdown2Value === "" ? `${dropdown1Value}` : `${dropdown1Value} ${dropdown2Value}`;
+          updatedData.isEdited = true; // Mark as edited
+          
+          return {
+            ...node,
+            data: updatedData,
+          };
+        }
+        return node;
+      });
   
       // Explicitly update nodesRef
       nodesRef.current = updatedNodes;
@@ -899,8 +908,6 @@ useEffect(() => {
   };
 
   const handleConfirmEdit = (nodeId) => {
-    console.log('Confirming edit for node:', nodeId);
-    console.log('Available nodes in nodesRef.current:', nodesRef.current.map(n => ({ id: n.id, data: n.data })));
     
     // Remove the confirm button and the trash button
     setNodes((prevNodes) =>
@@ -909,109 +916,74 @@ useEffect(() => {
       )
     );
     
-    // Find the updated node - use nodesRef.current which is updated by handleNodeEditChange
-    const updatedNode = nodesRef.current.find((node) => node.id === nodeId);
-    console.log('Found updated node:', updatedNode?.data);
-
-    if (updatedNode) {
-      const dropdown1Value = updatedNode.data.dropdown1;
-      const dropdown2Value = updatedNode.data.dropdown2;
-
-      // Build the complete decomposition structure BEFORE updating the node
-      // This way we can use the current dropdown values directly
-      const editedSubtasks = data.subtasks[0].map(task => {
-        if (task.hash === nodeId) {
-          // This is the task we just edited, use the dropdown values
-          console.log(`Using edited data for ${task.hash}:`, {
-            task_name: dropdown1Value,
-            args: dropdown2Value === "" ? [] : [dropdown2Value]
-          });
+    // Build the complete decomposition structure from current node data
+    // Filter out deleted tasks (tasks that don't exist in nodesRef.current)
+    const editedSubtasks = data.subtasks[0]
+      .filter(task => {
+        // Only include tasks that still exist in the current nodes
+        return nodesRef.current.some(node => node.id === task.hash);
+      })
+      .map(task => {
+        const taskNode = nodesRef.current.find(node => node.id === task.hash);
+        if (taskNode && taskNode.data.isEdited === true) {
+          // This task has been edited, use the current node data
           return {
-            task_name: dropdown1Value,
-            args: dropdown2Value === "" ? [] : [dropdown2Value]
+            task_name: taskNode.data.task_name,
+            args: taskNode.data.args
           };
         } else {
-          // For other tasks, check if they have been edited
-          const taskNode = nodesRef.current.find(node => node.id === task.hash);
-          console.log(`Processing task ${task.hash}:`, {
-            taskNode: taskNode?.data,
-            original: { task_name: task.task_name, args: task.args }
-          });
-          
-          if (taskNode && taskNode.data.task_name && taskNode.data.args !== undefined) {
-            // This task has been edited
-            console.log(`Using edited data for ${task.hash}:`, {
-              task_name: taskNode.data.task_name,
-              args: taskNode.data.args
-            });
-            return {
-              task_name: taskNode.data.task_name,
-              args: taskNode.data.args
-            };
-          } else {
-            // This task hasn't been edited, use original data
-            console.log(`Using original data for ${task.hash}:`, {
-              task_name: task.task_name,
-              args: task.args
-            });
-            return {
-              task_name: task.task_name,
-              args: task.args
-            };
-          }
+          // This task hasn't been edited, use original data
+          return {
+            task_name: task.task_name,
+            args: task.args
+          };
         }
       });
 
-      // Update the node to return to its original interface
-      setNodes((prevNodes) =>
-        prevNodes.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  task_name: dropdown1Value,
-                  args: dropdown2Value === "" ? [] : [dropdown2Value],
-                  label: dropdown2Value === "" ? `${dropdown1Value}` : `${dropdown1Value} ${dropdown2Value}`,
-                  dropdown1: dropdown1Value,
-                  dropdown2: dropdown2Value,
-                },
-              }
-            : node
-        )
-      );
-
-      // Send the complete decomposition structure
-      socket.emit("message", {
-        type: 'response_decomposition_with_edit',
-        response: {
-          user_choice: "gui_edit",
-          edited_decomposition: {
-            head: data.head,
-            subtasks: [editedSubtasks]
-          }
+    // Send the complete decomposition structure
+    socket.emit("message", {
+      type: 'response_decomposition_with_edit',
+      response: {
+        user_choice: "gui_edit",
+        edited_decomposition: {
+          head: data.head,
+          subtasks: [editedSubtasks]
         }
-      });
-    } else {
-      console.error(`Node with id ${nodeId} not found.`);
-    }
+      }
+    });
+
+    // Reset edit state for all nodes after sending the data
+    setNodes((prevNodes) =>
+      prevNodes.map((node) => {
+        // Only reset nodes that have been edited
+        if (node.data.isEdited === true) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              // Keep the current values but remove the edit marker
+              // The node will now show the updated values but won't be considered "edited"
+              isEdited: false,
+            }
+          };
+        }
+        return node;
+      })
+    );
   };
+
+  
   const handleTrashClick = (nodeId) => {
-    // Remove the node and its associated buttons (trash, confirm, edit)
+    // Remove the node and its associated buttons (trash, edit)
     setNodes((prevNodes) =>
       prevNodes.filter(
         (node) =>
           node.id !== nodeId && // Remove the main node
           node.id !== `${nodeId}-trash` && // Remove the trash button
-          node.id !== `${nodeId}-confirm` && // Remove the confirm button
           node.id !== `${nodeId}-edit` // Remove the edit button
       )
     );
     
-    // Send a message to the server
-    socket.emit("message", {
-      type: 'response_decomposition_with_edit'
-    });
   };
 }
 

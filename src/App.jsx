@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
 import RequestUserTask from './requestUserTask';
 import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
-import EditDecomposition from './EditDecomposition';
 import Display from './Display';
 import Chatbot from './chatbot';
 import DisplayAddedMethod from './DisplayAddedMethod';
