@@ -751,8 +751,6 @@ useEffect(() => {
     };
 
   const handleAddMethod = () => {
-    const addMethodNode = nodesRef.current.find(n => n.id === 'add method');
-    const position = addMethodNode?.position || { x: 50, y: 50 };
   
     socket.emit("message", {type: 'response_decomposition_with_edit', 
                            response: {user_choice: 'add_method'}});

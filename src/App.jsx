@@ -16,19 +16,32 @@ function App () {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [chatbotPosition, setChatbotPosition] = useState({ x: 50, y: 50 });
+  const nodesRef = useRef([]);
   // these are constants that pass through each components
   // all components just make changes to these constants
   // and display renders them
 
   useEffect(() => {
+    // Keep nodesRef in sync with nodes state
+    nodesRef.current = nodes;
+    
+    // Update chatbot position when message changes
+    if (message?.type === 'confirm_best_match_decomposition' && message?.text?.head?.hash) {
+      const headHash = message.text.head.hash;
+      const targetNode = nodesRef.current.find(node => node.id.includes(headHash));
+      if (targetNode) {
+        setChatbotPosition({
+          x: targetNode.position.x + 50,
+          y: targetNode.position.y
+        });
+      }
+    }
+  }, [message]);
+
+  useEffect(() => {
     socket.on('message', (data) => {
       console.log('Received from server:', data);
       setMessage(data);
-
-      // ✅ If position information is present, update chatbot position for every message
-      if (data?.position) {
-        setChatbotPosition(data.position);
-      }
     });
     return () => {
       socket.off('message');
@@ -51,7 +64,7 @@ function App () {
               ...node,
               position: {
                 ...node.position,
-                x: node.position.x + 350, // Shift node to the right
+                x: node.position.x + 400, // Shift node to the right
               },
             };
           }
@@ -142,7 +155,7 @@ function App () {
             id: 'chatbot-node',
             type: 'chatbot',
             position: {
-              x: chatbotPosition.x,
+              x: chatbotPosition.x+150,
               y: chatbotPosition.y - 200, // Offset the chatbot's vertical position by 200 units
             },
             data: { socket, message },
@@ -152,7 +165,7 @@ function App () {
         ];
       });
     }
-  }, [showChatbot, message, chatbotPosition]); // include chatbotPosition  
+  }, [showChatbot, message, chatbotPosition]); // include chatbotPosition for position updates  
 
   // Remove chatbot node when showChatbot becomes false
   useEffect(() => {
