@@ -163,168 +163,125 @@ useEffect(() => {
       // Don't auto-send add_method, let user choose
     }
 
-    // Add yes node
-    const yesNode = {
-      id: `${data.head.hash}-unhide-0`,
-      // position: { x: parentNode.position.x + 250, y: parentNode.position.y },
-      position: { 
-        x: parentNode.position.x + 200, 
-        y: parentNode.position.y + 3.5
-      },
-      data: { 
-        label: "✓ Approve", 
-        onClick: () => handleConfirm(yesNode,0,parentNode) 
-      },
-      style: {
-        background: '#95B9F3', 
-        width: '70px',
-        height: '32px',
-        borderRadius: '16px',
-        border: 'none',
-        fontSize: '10px',
-        // fontWeight: '500',
-      },
-      sourcePosition: 'right',
-      targetPosition: 'left',
-    }
-
+    // Create method selection nodes for each available method
+    const methodNodes = [];
+    const methodButtons = [];
     
-    if (!nodes.some(node => node.id === yesNode.id)) {
-      setNodes(prev => [...prev, yesNode]);
-    } else {
-      setNodes(prev => prev.map(node => {
-        if (node.id === yesNode.id) {
-          return { ...node,  
-            data: { 
-              label: "✓ Approve",
-              onClick: () => handleConfirm(yesNode,0,parentNode) 
-            }, 
-          };
-        }
-        return node;
-      }));
-    }
-
-    // Add edge from parent node to yes nodes
-    setEdges(prev => [...prev, {
-      id: `e-${parentNode.id}-${yesNode.id}`,
-      source: parentNode.id,
-      target: yesNode.id,
-      markerEnd: {
-        type: MarkerType.Arrow,
-        strokeWidth: 2,
-        color: currentEdgeColor
-      },
-      style: {
-        strokeWidth: 2,
-        stroke: currentEdgeColor
-      },
-      // debugging
-      // label: `e-${parentNode.id}-${yesNode.id}`,
-    }]);
-
-    // Add × Reject
-    const rejectNode = {
-      id: 'reject',
-      position: {
-        x: yesNode.position.x,
-        y: yesNode.position.y + 40,
-      },
-      data: {
-        label: '× Reject',
-        onClick: () => handleRejectClick(yesNode, parentNode, data),
-      },
-      style: {
-        background: '#D9D9D9',
-        width: '70px',
-        height: '32px',
-        borderRadius: '16px',
-        border: 'none',
-        fontSize: '10px',
-        // fontWeight: '500',
-      },
-    };
-
-    setNodes(prev => [...prev, rejectNode]);
-
-    const newNodes = [];
-    const newEdges = [];
-
-    // Create child nodes for each subtask
-    data.subtasks[0].forEach((task, subIndex) => {
-      const taskNode = {
-        id: task.hash,
-        position: { 
-          x: yesNode.position.x + 150, 
-          y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
+    data.subtasks.forEach((methodSubtasks, methodIndex) => {
+      // Create a method description node
+      const methodNode = {
+        id: `${data.head.hash}-method-${methodIndex}`,
+        position: {
+          x: parentNode.position.x + 200,
+          y: parentNode.position.y + methodIndex * 80
         },
-        data: { 
-          label: `${task.task_name} ${task.args}`,
-          task_name: task.task_name,
-          args: task.args,
-          hash: task.hash
+        data: {
+          label: `Method ${methodIndex + 1}: ${methodSubtasks.map(task => task.task_name).join(', ')}`,
         },
         style: {
-          background: currentNodeColor,
+          background: '#f0f8ff',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          padding: '8px',
+          fontSize: '11px',
+          width: '200px',
+          height: 'auto',
+        }
+      };
+      methodNodes.push(methodNode);
+      
+      // Create a choose button for this method
+      const chooseButton = {
+        id: `${data.head.hash}-choose-${methodIndex}`,
+        position: {
+          x: parentNode.position.x + 420,
+          y: parentNode.position.y + methodIndex * 80 + 10
+        },
+        data: {
+          label: `✓ Choose Method ${methodIndex + 1}`,
+          onClick: () => handleConfirm(chooseButton, methodIndex, parentNode)
+        },
+        style: {
+          background: '#95B9F3',
+          width: '120px',
+          height: '28px',
+          borderRadius: '14px',
           border: 'none',
+          fontSize: '10px',
         },
         sourcePosition: 'right',
         targetPosition: 'left',
       };
+      methodButtons.push(chooseButton);
+    });
+    
+    // Add all method nodes and buttons
+    setNodes(prev => [...prev, ...methodNodes, ...methodButtons]);
 
-      newNodes.push(taskNode);
-
-      // Add edge from yes node to task node
-      newEdges.push({
-        id: `e-${parentNode.id}-unhide-${taskNode.id}`,
-        source: yesNode.id,
-        target: `${taskNode.id}`,
+    // Add edges from parent to method nodes
+    data.subtasks.forEach((methodSubtasks, methodIndex) => {
+      setEdges(prev => [...prev, {
+        id: `e-${parentNode.id}-method-${methodIndex}`,
+        source: parentNode.id,
+        target: `${data.head.hash}-method-${methodIndex}`,
         markerEnd: {
           type: MarkerType.Arrow,
           strokeWidth: 2,
-          color: currentEdgeColor,
+          color: currentEdgeColor
         },
         style: {
           strokeWidth: 2,
-          stroke: currentEdgeColor,
+          stroke: currentEdgeColor
         },
-        // debugging
-        // label: `e-${parentNode.id}-unhide-${taskNode.id}`,
-      });
-
-      // if (subIndex === 0) {
-      // Add edit button next to the task node
-      const editButtonNode = {
-        id: `${task.hash}-edit`,
-        position: {
-          x: taskNode.position.x + 155, // Position next to the task node
-          y: taskNode.position.y,
-        },
-        data: {
-          label: '✎',
-          onClick: () => handleEditClick(task),
-        },
-        style: {
-          // background: '#FFFFFF',
-          background: 'none',
-          width: '20px',
-          height: '20px',
-          borderRadius: 'none',
-          border: '1px solid black',
-          fontSize: '10px',
-          textAlign: 'center',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
-      };
-
-      newNodes.push(editButtonNode);
-      // }
+      }]);
     });
 
-  setNodes(prev => [...prev, ...newNodes]);
-  setEdges(prev => [...prev, ...newEdges]);
+    // Add edges from method nodes to choose buttons
+    data.subtasks.forEach((methodSubtasks, methodIndex) => {
+      setEdges(prev => [...prev, {
+        id: `e-method-${methodIndex}-choose-${methodIndex}`,
+        source: `${data.head.hash}-method-${methodIndex}`,
+        target: `${data.head.hash}-choose-${methodIndex}`,
+        markerEnd: {
+          type: MarkerType.Arrow,
+          strokeWidth: 2,
+          color: currentEdgeColor
+        },
+        style: {
+          strokeWidth: 2,
+          stroke: currentEdgeColor
+        },
+      }]);
+    });
+
+    // Add "Add New Method" button for when user wants to create a custom method
+    const addMethodNode = {
+      id: 'add-method',
+      position: {
+        x: parentNode.position.x + 200,
+        y: parentNode.position.y + data.subtasks.length * 80 + 20,
+      },
+      data: {
+        label: '+ Add New Method',
+        onClick: () => {
+          socket.emit("message", {type: 'response_decomposition_with_edit', response: {user_choice: 'add_method'}});
+          onConfirm(null);
+        },
+      },
+      style: {
+        background: '#ffc107',
+        width: '120px',
+        height: '32px',
+        borderRadius: '16px',
+        border: 'none',
+        fontSize: '10px',
+        color: '#212529',
+      },
+    };
+
+    setNodes(prev => [...prev, addMethodNode]);
+
+    // The new interface design is complete above
   }, [data]);
   
   // Effect 2: render remaining options when showAllOptions===true
