@@ -59,6 +59,9 @@ function Chatbot({ socket, message }) {
       else if (message['type'] === 'correct_grounding') {
         correctGrounding(message);
       }
+      else if (message['type'] === 'chatbot_edit_mode') {
+        buildChatEditUI(message);
+      }
     }
   }, [message]);
 
@@ -96,7 +99,8 @@ function Chatbot({ socket, message }) {
     
     // Enhanced formatting for different message types
     if (data['type'] === 'display_decomposition_analysis') {
-      displayText = formatAnalysisText(data['text']);
+      buildDecompositionAnalysisUI(data);
+      return;
     } else if (data['type'] === 'display_method_creation') {
       displayText = formatMethodCreationText(data['text']);
     } else if (data['type'] === 'display_edit_options') {
@@ -129,6 +133,202 @@ function Chatbot({ socket, message }) {
     return text
       .replace(/Option \d+:/g, '<br><strong>$&</strong>')
       .replace(/\n/g, '<br>');
+  }
+
+  function buildDecompositionAnalysisUI(data) {
+    const analysisContainer = document.createElement('div');
+    analysisContainer.className = 'decomposition-analysis';
+    analysisContainer.style.cssText = `
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 8px 0;
+    `;
+
+    // Parse the analysis text to extract components
+    const text = data['text'];
+    
+    // Create header
+    const header = document.createElement('div');
+    header.innerHTML = '<strong>🔍 Decomposition Analysis</strong>';
+    header.style.cssText = `
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #2c3e50;
+    `;
+    analysisContainer.appendChild(header);
+
+    // Create content sections
+    const content = document.createElement('div');
+    content.innerHTML = formatAnalysisText(text);
+    content.style.cssText = `
+      font-size: 13px;
+      line-height: 1.4;
+      color: #495057;
+    `;
+    analysisContainer.appendChild(content);
+
+    // Add to chat
+    const container = document.getElementById('prompt-message');
+    const msgHTML = `
+      <div class="chatbot-container-msg msg left-msg">
+        <div class="msg-img" style="background-image: url(${valPic})"></div>
+        <div class="msg-bubble">
+          <div class="msg-text"></div>
+        </div>
+      </div>
+    `;
+    container.insertAdjacentHTML("beforeend", msgHTML);
+    
+    const lastMsgBubble = container.lastElementChild.querySelector(".msg-bubble");
+    lastMsgBubble.appendChild(analysisContainer);
+    container.scrollTop += 500;
+  }
+
+  function buildChatEditUI(data) {
+    const editContainer = document.createElement('div');
+    editContainer.className = 'chat-edit-form';
+    editContainer.style.cssText = `
+      background: #fff;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 8px 0;
+    `;
+
+    // Header
+    const header = document.createElement('div');
+    header.innerHTML = '<strong>✏️ Chat Edit Mode</strong>';
+    header.style.cssText = `
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #2c3e50;
+    `;
+    editContainer.appendChild(header);
+
+    // Instructions
+    const instructions = document.createElement('div');
+    instructions.innerHTML = 'Describe how you want to decompose this task:';
+    instructions.style.cssText = `
+      font-size: 12px;
+      color: #6c757d;
+      margin-bottom: 8px;
+    `;
+    editContainer.appendChild(instructions);
+
+    // Textarea for user input
+    const textarea = document.createElement('textarea');
+    textarea.placeholder = 'Example: First check if I have enough ingredients, then get missing ones, prepare them separately, cook meat and vegetables in parallel...';
+    textarea.style.cssText = `
+      width: 100%;
+      height: 80px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      padding: 8px;
+      font-size: 12px;
+      font-family: inherit;
+      color: #2A2F3A;
+      background: #fff;
+      resize: vertical;
+      margin-bottom: 8px;
+    `;
+    editContainer.appendChild(textarea);
+
+    // Preconditions input
+    const preconditionsLabel = document.createElement('div');
+    preconditionsLabel.innerHTML = 'Preconditions (optional):';
+    preconditionsLabel.style.cssText = `
+      font-size: 12px;
+      color: #6c757d;
+      margin-bottom: 4px;
+    `;
+    editContainer.appendChild(preconditionsLabel);
+
+    const preconditionsInput = document.createElement('input');
+    preconditionsInput.type = 'text';
+    preconditionsInput.placeholder = 'e.g., ingredients_available, stove_free';
+    preconditionsInput.style.cssText = `
+      width: 100%;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      padding: 6px;
+      font-size: 12px;
+      font-family: inherit;
+      color: #2A2F3A;
+      background: #fff;
+      margin-bottom: 10px;
+    `;
+    editContainer.appendChild(preconditionsInput);
+
+    // Submit button
+    const submitButton = document.createElement('button');
+    submitButton.textContent = 'Submit Edit';
+    submitButton.style.cssText = `
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    `;
+    
+    submitButton.onclick = (e) => {
+      e.preventDefault();
+      const chatbotResponse = textarea.value.trim();
+      const preconditionsText = preconditionsInput.value.trim();
+      const preconditions = preconditionsText ? 
+        preconditionsText.split(',').map(s => s.trim()).filter(s => s) : [];
+
+      if (!chatbotResponse) {
+        alert('Please describe how you want to decompose the task.');
+        return;
+      }
+
+      socket.emit('message', {
+        type: 'response_decomposition_with_edit',
+        response: {
+          user_choice: 'chatbot_edit',
+          chatbot_response: chatbotResponse,
+          preconditions: preconditions
+        }
+      });
+
+      // Show user's input in chat
+      appendMessage("Me", userPic, "right", `Chat Edit: ${chatbotResponse}`);
+      
+      // Hide the edit form
+      editContainer.style.display = 'none';
+    };
+
+    submitButton.onmouseover = () => submitButton.style.backgroundColor = '#0056b3';
+    submitButton.onmouseout = () => submitButton.style.backgroundColor = '#007bff';
+
+    editContainer.appendChild(submitButton);
+
+    // Add to chat
+    const container = document.getElementById('prompt-message');
+    const msgHTML = `
+      <div class="chatbot-container-msg msg left-msg">
+        <div class="msg-img" style="background-image: url(${valPic})"></div>
+        <div class="msg-bubble">
+          <div class="msg-text"></div>
+        </div>
+      </div>
+    `;
+    container.insertAdjacentHTML("beforeend", msgHTML);
+    
+    const lastMsgBubble = container.lastElementChild.querySelector(".msg-bubble");
+    lastMsgBubble.appendChild(editContainer);
+    container.scrollTop += 500;
+
+    // Focus on textarea
+    textarea.focus();
   }
 
   function confirmation(data) {
@@ -232,17 +432,29 @@ function Chatbot({ socket, message }) {
       objectsSelect.appendChild(option);
     });
 
-    // Create submit button
+    // Create button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    `;
+
+    // Create submit correction button
     const submitButton = document.createElement('button');
-    submitButton.className = 'chatbot-container buttons';
     submitButton.textContent = 'Submit Correction';
-    submitButton.style.width = '100%';
-    submitButton.style.padding = '10px';
-    submitButton.style.backgroundColor = '#007bff';
-    submitButton.style.color = 'white';
-    submitButton.style.border = 'none';
-    submitButton.style.borderRadius = '4px';
-    submitButton.style.cursor = 'pointer';
+    submitButton.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    `;
     
     submitButton.onclick = () => {
       const selectedAction = actionSelect.value;
@@ -260,12 +472,67 @@ function Chatbot({ socket, message }) {
       appendMessage("Me", userPic, "right", `Corrected to: ${selectedAction} -> ${selectedObjects.join(', ')}`);
     };
 
+    // Create edit decomposition button
+    const editButton = document.createElement('button');
+    editButton.textContent = '✏️ Edit Decomposition';
+    editButton.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    `;
+    
+    editButton.onclick = () => {
+      // Send edit request
+      socket.emit('message', {
+        type: "correct_grounding_response", 
+        response: "EDIT_DECOMPOSITION"
+      });
+      
+      appendMessage("Me", userPic, "right", "I want to edit the decomposition instead");
+    };
+
+    // Create add new method button
+    const addMethodButton = document.createElement('button');
+    addMethodButton.textContent = '+ Add New Method';
+    addMethodButton.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      background-color: #ffc107;
+      color: #212529;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    `;
+    
+    addMethodButton.onclick = () => {
+      // Send add method request
+      socket.emit('message', {
+        type: "correct_grounding_response", 
+        response: "ADD_NEW_METHOD"
+      });
+      
+      appendMessage("Me", userPic, "right", "I want to add a new method instead");
+    };
+
+    // Add buttons to container
+    buttonContainer.appendChild(submitButton);
+    buttonContainer.appendChild(editButton);
+    buttonContainer.appendChild(addMethodButton);
+
     // Assemble form
     form.appendChild(actionLabel);
     form.appendChild(actionSelect);
     form.appendChild(objectsLabel);
     form.appendChild(objectsSelect);
-    form.appendChild(submitButton);
+    form.appendChild(buttonContainer);
     dialog.appendChild(form);
     
     appendMessage("VAL", valPic, "left", data['text'], null, dialog);

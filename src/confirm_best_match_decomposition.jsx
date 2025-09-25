@@ -157,12 +157,10 @@ useEffect(() => {
       }
     }));
 
-    // if there is no subtask just update the highlighted path and return
+    // if there is no subtask, still show the decomposition interface with options
     if (data.subtasks.length === 0) {
-      socket.emit("message", {type: 'response_decomposition_with_edit', response: {user_choice: 'add_method'}});
-      console.log("User confirmed decomposition with no subtask");
-      onConfirm(null);
-      return;
+      console.log("No subtasks found, showing decomposition options for NEW_ACTION");
+      // Don't auto-send add_method, let user choose
     }
 
     // Add yes node
@@ -266,17 +264,9 @@ useEffect(() => {
           args: task.args,
           hash: task.hash
         },
-        // debugging
-        // data: {label: `${task.hash}-${task.task_name}`},
-        _style: {
+        style: {
           background: currentNodeColor,
           border: 'none',
-        },
-        get style() {
-          return this._style;
-        },
-        set style(value) {
-          this._style = value;
         },
         sourcePosition: 'right',
         targetPosition: 'left',
@@ -712,8 +702,28 @@ useEffect(() => {
         fontSize: '10px',
       },
     };
+
+    const chatEditNode = {
+      id: 'chat edit',
+      position: {
+        x: yesNode.position.x - 15,
+        y: yesNode.position.y + 120,
+      },
+      data: {
+        label: '💬 Chat Edit',
+        onClick: handleChatEditClick,
+      },
+      style: {
+        width: '100px',
+        background: moreNodeColor,
+        height: '32px',
+        borderRadius: '16px',
+        border: 'none',
+        fontSize: '10px',
+      },
+    };
   
-    setNodes(prev => [...prev, noNode, addMethodNode]);
+    setNodes(prev => [...prev, noNode, addMethodNode, chatEditNode]);
   
     setNodes(prev => prev.filter(n => n.id !== 'reject'));
   };
@@ -754,6 +764,26 @@ useEffect(() => {
   
     socket.emit("message", {type: 'response_decomposition_with_edit', 
                            response: {user_choice: 'add_method'}});
+    onConfirm(null);
+  };
+
+  const handleChatEditClick = () => {
+    // Send message to trigger chatbot edit mode
+    socket.emit("message", {
+      type: 'chatbot_edit_mode',
+      text: `Edit the decomposition for: ${data.head.name}(${data.head.V})`,
+      task_data: data
+    });
+    
+    // Clean up the current UI
+    setNodes(prevNodes =>
+      prevNodes.filter(node => 
+        node.id !== 'noNode' && 
+        node.id !== 'add method' && 
+        node.id !== 'chat edit'
+      )
+    );
+    
     onConfirm(null);
   };
 
@@ -1152,6 +1182,9 @@ useEffect(() => {
       editedSubtasks = [...existingTasks, ...newTasks];
     }
 
+    // Show precondition input dialog
+    const preconditions = prompt("Enter preconditions (optional, comma-separated):\ne.g., ingredients_available, stove_free", "");
+    
     // Send the complete decomposition structure
     socket.emit("message", {
       type: 'response_decomposition_with_edit',
@@ -1159,7 +1192,8 @@ useEffect(() => {
         user_choice: "gui_edit",
         edited_decomposition: {
           head: data.head,
-          subtasks: [editedSubtasks]
+          subtasks: [editedSubtasks],
+          preconditions: preconditions ? preconditions.split(',').map(s => s.trim()).filter(s => s) : []
         }
       }
     });
