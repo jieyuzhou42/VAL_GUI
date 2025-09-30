@@ -25,7 +25,7 @@ function findAllAncestors(nodeId, edges) {
 }
 
 function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
-        nodes, edges, setNodes, setEdges }) {
+        nodes, edges, setNodes, setEdges, readOnly = false }) {
   // console.log("nodes in ConfirmDecomp:", nodes);
   // console.log('edges in ConfirmDecomp:', edges);
   const [showAllOptions, setShowAllOptions] = useState(false);
@@ -159,95 +159,110 @@ useEffect(() => {
 
     // if there is no subtask just update the highlighted path and return
     if (data.subtasks.length === 0) {
-      socket.emit("message", {type: 'response_decomposition_with_edit', response: {user_choice: 'add_method'}});
-      console.log("User confirmed decomposition with no subtask");
-      onConfirm(null);
+      if (!readOnly) {
+        socket.emit("message", {type: 'response_decomposition_with_edit', response: {user_choice: 'add_method'}});
+        console.log("User confirmed decomposition with no subtask");
+        onConfirm(null);
+      }
       return;
     }
 
-    // Add yes node
-    const yesNode = {
-      id: `${data.head.hash}-unhide-0`,
-      // position: { x: parentNode.position.x + 250, y: parentNode.position.y },
-      position: { 
-        x: parentNode.position.x + 200, 
-        y: parentNode.position.y + 3.5
-      },
-      data: { 
-        label: "✓ Approve", 
-        onClick: () => handleConfirm(yesNode,0,parentNode) 
-      },
-      style: {
-        background: '#95B9F3', 
-        width: '70px',
-        height: '32px',
-        borderRadius: '16px',
-        border: 'none',
-        fontSize: '10px',
-        // fontWeight: '500',
-      },
-      sourcePosition: 'right',
-      targetPosition: 'left',
-    }
+    // Declare yesNode outside the if block so it's accessible later
+    let yesNode;
+    
+    // Add yes node only if not in readOnly mode
+    if (!readOnly) {
+      yesNode = {
+        id: `${data.head.hash}-unhide-0`,
+        // position: { x: parentNode.position.x + 250, y: parentNode.position.y },
+        position: { 
+          x: parentNode.position.x + 200, 
+          y: parentNode.position.y + 3.5
+        },
+        data: { 
+          label: "✓ Approve", 
+          onClick: () => handleConfirm(yesNode,0,parentNode) 
+        },
+        style: {
+          background: '#95B9F3', 
+          width: '70px',
+          height: '32px',
+          borderRadius: '16px',
+          border: 'none',
+          fontSize: '10px',
+          // fontWeight: '500',
+        },
+        sourcePosition: 'right',
+        targetPosition: 'left',
+      }
 
     
-    if (!nodes.some(node => node.id === yesNode.id)) {
-      setNodes(prev => [...prev, yesNode]);
+      if (!nodes.some(node => node.id === yesNode.id)) {
+        setNodes(prev => [...prev, yesNode]);
+      } else {
+        setNodes(prev => prev.map(node => {
+          if (node.id === yesNode.id) {
+            return { ...node,  
+              data: { 
+                label: "✓ Approve",
+                onClick: () => handleConfirm(yesNode,0,parentNode) 
+              }, 
+            };
+          }
+          return node;
+        }));
+      }
+
+      // Add edge from parent node to yes nodes
+      setEdges(prev => [...prev, {
+        id: `e-${parentNode.id}-${yesNode.id}`,
+        source: parentNode.id,
+        target: yesNode.id,
+        markerEnd: {
+          type: MarkerType.Arrow,
+          strokeWidth: 2,
+          color: currentEdgeColor
+        },
+        style: {
+          strokeWidth: 2,
+          stroke: currentEdgeColor
+        },
+        // debugging
+        // label: `e-${parentNode.id}-${yesNode.id}`,
+      }]);
+
+      // Add × Reject
+      const rejectNode = {
+        id: 'reject',
+        position: {
+          x: yesNode.position.x,
+          y: yesNode.position.y + 40,
+        },
+        data: {
+          label: '× Reject',
+          onClick: () => handleRejectClick(yesNode, parentNode, data),
+        },
+        style: {
+          background: '#D9D9D9',
+          width: '70px',
+          height: '32px',
+          borderRadius: '16px',
+          border: 'none',
+          fontSize: '10px',
+          // fontWeight: '500',
+        },
+      };
+
+      setNodes(prev => [...prev, rejectNode]);
     } else {
-      setNodes(prev => prev.map(node => {
-        if (node.id === yesNode.id) {
-          return { ...node,  
-            data: { 
-              label: "✓ Approve",
-              onClick: () => handleConfirm(yesNode,0,parentNode) 
-            }, 
-          };
+      // If readOnly, create a dummy yesNode position for layout purposes
+      yesNode = {
+        position: {
+          x: parentNode.position.x + 200,
+          y: parentNode.position.y + 3.5
         }
-        return node;
-      }));
+      };
     }
-
-    // Add edge from parent node to yes nodes
-    setEdges(prev => [...prev, {
-      id: `e-${parentNode.id}-${yesNode.id}`,
-      source: parentNode.id,
-      target: yesNode.id,
-      markerEnd: {
-        type: MarkerType.Arrow,
-        strokeWidth: 2,
-        color: currentEdgeColor
-      },
-      style: {
-        strokeWidth: 2,
-        stroke: currentEdgeColor
-      },
-      // debugging
-      // label: `e-${parentNode.id}-${yesNode.id}`,
-    }]);
-
-    // Add × Reject
-    const rejectNode = {
-      id: 'reject',
-      position: {
-        x: yesNode.position.x,
-        y: yesNode.position.y + 40,
-      },
-      data: {
-        label: '× Reject',
-        onClick: () => handleRejectClick(yesNode, parentNode, data),
-      },
-      style: {
-        background: '#D9D9D9',
-        width: '70px',
-        height: '32px',
-        borderRadius: '16px',
-        border: 'none',
-        fontSize: '10px',
-        // fontWeight: '500',
-      },
-    };
-
-    setNodes(prev => [...prev, rejectNode]);
 
     const newNodes = [];
     const newEdges = [];

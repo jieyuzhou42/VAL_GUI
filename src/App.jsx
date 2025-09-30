@@ -111,10 +111,24 @@ function App () {
     }
   }, [message]);
 
-  //after user create a method hide the chat box automatically
+  // Show chatbot when confirm_best_match_decomposition message is received
   useEffect(() => {
     if (message && message.type === 'confirm_best_match_decomposition') {
-      setShowChatbot(false);
+      setShowChatbot(true);
+    }
+  }, [message]);
+
+  // Show chatbot when thinking analysis message is received
+  useEffect(() => {
+    if (message && message.type === 'display_thinking_analysis') {
+      setShowChatbot(true);
+    }
+  }, [message]);
+
+  // Show chatbot when show thinking analysis and decomposition message is received
+  useEffect(() => {
+    if (message && message.type === 'show_thinking_analysis_and_decomposition') {
+      setShowChatbot(true);
     }
   }, [message]);
 
