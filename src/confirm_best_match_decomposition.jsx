@@ -40,6 +40,178 @@ useEffect(() => {
   nodesRef.current = nodes;
 }, [nodes]);
 
+// Listen for create method event from chatbot
+useEffect(() => {
+  const handleCreateMethodFromChatbot = (event) => {
+    console.log('Received start_gui_create_method event from chatbot');
+    const parentNode = nodes.find(n => n.id.includes(data.head.hash));
+    if (!parentNode) {
+      console.warn('Parent node not found for creating new method');
+      return;
+    }
+    
+    // Create a new editable node at the position where subtasks would be
+    const newTaskId = `${data.head.hash}-new-${Date.now()}`;
+    const dropdownOptions1 = data.available_actions || [];
+    const dropdownOptions2 = data.env_objects || [];
+    const defaultTaskName = (dropdownOptions1 && dropdownOptions1[0]) || '';
+    const defaultArg = '';
+    
+    const newNode = {
+      id: newTaskId,
+      position: {
+        x: parentNode.position.x + 300,
+        y: parentNode.position.y
+      },
+      data: {
+        label: (
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <select
+              defaultValue={defaultTaskName}
+              onChange={(e) => handleNodeEditChange(e, newTaskId, 'dropdown1')}
+              style={{
+                width: '100px',
+                border: '1px solid black',
+                background: 'white',
+                textAlign: 'center',
+              }}
+            >
+              {dropdownOptions1.map((option, index) => (
+                <option key={index} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <select
+              defaultValue={defaultArg}
+              onChange={(e) => handleNodeEditChange(e, newTaskId, 'dropdown2')}
+              style={{
+                width: '100px',
+                border: '1px solid black',
+                background: 'white',
+                textAlign: 'center',
+              }}
+            >
+              <option value="">No object</option>
+              {dropdownOptions2.map((option, index) => (
+                <option key={index} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+        ),
+        task_name: defaultTaskName,
+        args: defaultArg === "" ? [] : [defaultArg],
+        dropdown1: defaultTaskName,
+        dropdown2: defaultArg
+      },
+      style: { background: currentNodeColor, border: 'none' },
+      sourcePosition: 'right',
+      targetPosition: 'left',
+    };
+    
+    // Add confirm button
+    const confirmButtonNode = {
+      id: `${newTaskId}-confirm`,
+      position: {
+        x: newNode.position.x + 130,
+        y: newNode.position.y + 30,
+      },
+      data: {
+        label: '✓',
+        onClick: () => handleConfirmEdit(newTaskId),
+      },
+      style: {
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+    
+    // Add trash button
+    const trashButtonNode = {
+      id: `${newTaskId}-trash`,
+      position: {
+        x: newNode.position.x + 155,
+        y: newNode.position.y + 30,
+      },
+      data: {
+        label: '🗑',
+        onClick: () => handleTrashClick(newTaskId),
+      },
+    style: { 
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+    
+    // Add + button for adding more nodes
+    const addButtonNode = {
+      id: `${newTaskId}-add`,
+        position: { 
+        x: newNode.position.x + 180,
+        y: newNode.position.y + 30,
+        },
+        data: { 
+        label: '+',
+        onClick: () => handleAddNode({ hash: newTaskId }),
+        },
+        style: {
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+    
+    setNodes(prev => [...prev, newNode, confirmButtonNode, trashButtonNode, addButtonNode]);
+    
+    // Add edge from parent to new node
+    setEdges(prev => [...prev, {
+      id: `e-${parentNode.id}-${newTaskId}`,
+        source: parentNode.id,
+      target: newTaskId,
+        markerEnd: {
+          type: MarkerType.Arrow,
+          strokeWidth: 2,
+        color: currentEdgeColor
+        },
+        style: {
+          strokeWidth: 2,
+        stroke: currentEdgeColor
+      },
+    }]);
+  };
+  
+  window.addEventListener('start_gui_create_method', handleCreateMethodFromChatbot);
+  
+  return () => {
+    window.removeEventListener('start_gui_create_method', handleCreateMethodFromChatbot);
+  };
+}, [nodes, data, setNodes, setEdges]);
+
 
   useEffect(() => {
     let parentNode = nodes.find(n => n.id.includes(data.head.hash));
@@ -169,110 +341,40 @@ useEffect(() => {
 
     // Declare yesNode outside the if block so it's accessible later
     let yesNode;
-    
-    // Add yes node only if not in readOnly mode
-    if (!readOnly) {
-      yesNode = {
-        id: `${data.head.hash}-unhide-0`,
-        // position: { x: parentNode.position.x + 250, y: parentNode.position.y },
-        position: { 
-          x: parentNode.position.x + 200, 
-          y: parentNode.position.y + 3.5
-        },
-        data: { 
-          label: "✓ Approve", 
-          onClick: () => handleConfirm(yesNode,0,parentNode) 
-        },
-        style: {
-          background: '#95B9F3', 
-          width: '70px',
-          height: '32px',
-          borderRadius: '16px',
-          border: 'none',
-          fontSize: '10px',
-          // fontWeight: '500',
-        },
-        sourcePosition: 'right',
-        targetPosition: 'left',
-      }
 
-    
-      if (!nodes.some(node => node.id === yesNode.id)) {
-        setNodes(prev => [...prev, yesNode]);
-      } else {
-        setNodes(prev => prev.map(node => {
-          if (node.id === yesNode.id) {
-            return { ...node,  
-              data: { 
-                label: "✓ Approve",
-                onClick: () => handleConfirm(yesNode,0,parentNode) 
-              }, 
-            };
-          }
-          return node;
-        }));
-      }
-
-      // Add edge from parent node to yes nodes
-      setEdges(prev => [...prev, {
-        id: `e-${parentNode.id}-${yesNode.id}`,
-        source: parentNode.id,
-        target: yesNode.id,
-        markerEnd: {
-          type: MarkerType.Arrow,
-          strokeWidth: 2,
-          color: currentEdgeColor
-        },
-        style: {
-          strokeWidth: 2,
-          stroke: currentEdgeColor
-        },
-        // debugging
-        // label: `e-${parentNode.id}-${yesNode.id}`,
-      }]);
-
-      // Add × Reject
-      const rejectNode = {
-        id: 'reject',
-        position: {
-          x: yesNode.position.x,
-          y: yesNode.position.y + 40,
-        },
-        data: {
-          label: '× Reject',
-          onClick: () => handleRejectClick(yesNode, parentNode, data),
-        },
-        style: {
-          background: '#D9D9D9',
-          width: '70px',
-          height: '32px',
-          borderRadius: '16px',
-          border: 'none',
-          fontSize: '10px',
-          // fontWeight: '500',
-        },
-      };
-
-      setNodes(prev => [...prev, rejectNode]);
-    } else {
-      // If readOnly, create a dummy yesNode position for layout purposes
-      yesNode = {
-        position: {
-          x: parentNode.position.x + 200,
-          y: parentNode.position.y + 3.5
-        }
-      };
-    }
+    // Always create yesNode as an invisible junction point for edge connections
+    // This serves as the split point: chatbot → yesNode → subtasks
+    yesNode = {
+      id: `${data.head.hash}-unhide-0`,
+      position: {
+        x: parentNode.position.x + 200,
+        y: parentNode.position.y + 3.5
+      },
+      data: { label: '' }, // Empty label makes it invisible
+      style: {
+        background: 'transparent',
+        border: 'none',
+        width: '1px',
+        height: '1px',
+      },
+      sourcePosition: 'right',
+      targetPosition: 'left',
+    };
 
     const newNodes = [];
     const newEdges = [];
+    
+    // Add the invisible junction node if it doesn't exist
+    if (!nodes.some(node => node.id === yesNode.id)) {
+      newNodes.push(yesNode);
+    }
 
     // Create child nodes for each subtask
     data.subtasks[0].forEach((task, subIndex) => {
       const taskNode = {
         id: task.hash,
         position: { 
-          x: yesNode.position.x + 150, 
+          x: yesNode.position.x + 300, // Increased from 150 to 300 to avoid chatbot overlap
           y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
         },
         data: { 
@@ -299,9 +401,10 @@ useEffect(() => {
 
       newNodes.push(taskNode);
 
-      // Add edge from yes node to task node
+      // Add edge from yesNode (invisible junction point) to task node
+      // yesNode serves as the split point where one line from chatbot becomes multiple lines to subtasks
       newEdges.push({
-        id: `e-${parentNode.id}-unhide-${taskNode.id}`,
+        id: `e-${yesNode.id}-${taskNode.id}`,
         source: yesNode.id,
         target: `${taskNode.id}`,
         markerEnd: {
@@ -313,8 +416,6 @@ useEffect(() => {
           strokeWidth: 2,
           stroke: currentEdgeColor,
         },
-        // debugging
-        // label: `e-${parentNode.id}-unhide-${taskNode.id}`,
       });
 
       // if (subIndex === 0) {
@@ -351,6 +452,61 @@ useEffect(() => {
   setNodes(prev => [...prev, ...newNodes]);
   setEdges(prev => [...prev, ...newEdges]);
   }, [data]);
+  
+  // Effect 1.5: Add edges for chatbot flow when chatbot appears
+  // Creates: parent → chatbot → junction point (yesNode)
+  useEffect(() => {
+    const chatbotNode = nodes.find(n => n.id === 'chatbot-node');
+    const parentNode = nodes.find(n => n.id.includes(data.head.hash));
+    const junctionNode = nodes.find(n => n.id === `${data.head.hash}-unhide-0`);
+    
+    if (chatbotNode && parentNode) {
+      // Edge 1: parent → chatbot
+      const edge1Id = `e-${parentNode.id}-chatbot`;
+      const edge1Exists = edges.some(e => e.id === edge1Id);
+      
+      if (!edge1Exists) {
+        setEdges(prev => [...prev, {
+          id: edge1Id,
+          source: parentNode.id,
+          target: 'chatbot-node',
+          markerEnd: {
+            type: MarkerType.Arrow,
+            strokeWidth: 2,
+            color: currentEdgeColor,
+          },
+          style: {
+            strokeWidth: 2,
+            stroke: currentEdgeColor,
+          },
+        }]);
+      }
+      
+      // Edge 2: chatbot → junction point (invisible yesNode)
+      // This creates the single line out from chatbot before it splits to subtasks
+      if (junctionNode) {
+        const edge2Id = `e-chatbot-${junctionNode.id}`;
+        const edge2Exists = edges.some(e => e.id === edge2Id);
+        
+        if (!edge2Exists) {
+          setEdges(prev => [...prev, {
+            id: edge2Id,
+            source: 'chatbot-node',
+            target: junctionNode.id,
+            markerEnd: {
+              type: MarkerType.Arrow,
+              strokeWidth: 2,
+              color: currentEdgeColor,
+            },
+            style: {
+              strokeWidth: 2,
+              stroke: currentEdgeColor,
+            },
+          }]);
+        }
+      }
+    }
+  }, [nodes.find(n => n.id === 'chatbot-node'), nodes.find(n => n.id === `${data.head.hash}-unhide-0`)]);
   
   // Effect 2: render remaining options when showAllOptions===true
   useEffect(() => {

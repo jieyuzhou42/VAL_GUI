@@ -12,7 +12,7 @@ const nodeTypes = {
 function Display({ nodes, edges }) {
     console.log("Display rendering with nodes:", nodes);
     return (
-        <div style={{ width: '90vw', height: '100vh', position: 'relative', zIndex: 0 }}>
+        <div style={{ width: '100vw', height: '100vh', position: 'relative', zIndex: 0 }}>
         <ReactFlow 
             nodes={nodes}
             edges={edges}

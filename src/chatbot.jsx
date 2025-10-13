@@ -254,23 +254,76 @@ Is it correct?`);
         type: 'response_decomposition_with_edit',
         response: { user_choice: 'approve', index: 0 }
       });
-      // Disable buttons after clicking
+      // Disable and fade out buttons after clicking
       approveButton.disabled = true;
       rejectButton.disabled = true;
+      approveButton.style.opacity = '0.3';
+      rejectButton.style.opacity = '0.3';
+      approveButton.style.cursor = 'not-allowed';
+      rejectButton.style.cursor = 'not-allowed';
     };
 
     const rejectButton = document.createElement('button');
     rejectButton.className = 'no';
     rejectButton.innerHTML = '× Reject';
     rejectButton.onclick = () => {
-      console.log('Grounding reject button clicked, sending response...');
-      socket.emit('message', {
-        type: 'response_decomposition_with_edit',
-        response: { user_choice: 'reject', index: 0 }
-      });
-      // Disable buttons after clicking
+      console.log('Decomposition reject button clicked');
+      // Disable and fade out the approve/reject buttons
       approveButton.disabled = true;
       rejectButton.disabled = true;
+      approveButton.style.opacity = '0.3';
+      rejectButton.style.opacity = '0.3';
+      approveButton.style.cursor = 'not-allowed';
+      rejectButton.style.cursor = 'not-allowed';
+      
+      // Create a new row for "More Options" and "+ Create Method" buttons
+      const secondRowDiv = document.createElement('div');
+      secondRowDiv.className = 'chatbot-container buttons';
+      secondRowDiv.style.marginTop = '10px';
+      
+      const moreOptionsButton = document.createElement('button');
+      moreOptionsButton.innerHTML = 'More Options';
+      moreOptionsButton.style.marginRight = '10px';
+      moreOptionsButton.style.background = 'rgb(236, 243, 254)';
+      moreOptionsButton.style.border = 'none';
+      moreOptionsButton.style.borderRadius = '16px';
+      moreOptionsButton.style.padding = '8px 16px';
+      moreOptionsButton.style.cursor = 'pointer';
+      moreOptionsButton.onclick = () => {
+        console.log('More Options clicked - this will show all decomposition options');
+        // This will trigger showing all options in the tree
+        // You can emit a message to trigger tree expansion if needed
+      };
+      
+      const createMethodButton = document.createElement('button');
+      createMethodButton.innerHTML = '+ Create Method';
+      createMethodButton.style.background = 'rgb(236, 243, 254)';
+      createMethodButton.style.border = 'none';
+      createMethodButton.style.borderRadius = '16px';
+      createMethodButton.style.padding = '8px 16px';
+      createMethodButton.style.cursor = 'pointer';
+      createMethodButton.onclick = () => {
+        console.log('Create Method clicked from chatbot, emitting start_gui_create_method event');
+        // Emit a custom event that the tree component can listen to
+        // This will trigger the tree to show editable nodes
+        const event = new CustomEvent('start_gui_create_method', {
+          detail: { fromChatbot: true }
+        });
+        window.dispatchEvent(event);
+        moreOptionsButton.disabled = true;
+        createMethodButton.disabled = true;
+        moreOptionsButton.style.opacity = '0.3';
+        createMethodButton.style.opacity = '0.3';
+      };
+      
+      secondRowDiv.appendChild(moreOptionsButton);
+      secondRowDiv.appendChild(createMethodButton);
+      
+      // Append the second row to the same message bubble
+      const lastMsgBubble = document.querySelector('.chatbot-container-msg.msg.left-msg:last-child .msg-bubble');
+      if (lastMsgBubble) {
+        lastMsgBubble.appendChild(secondRowDiv);
+      }
     };
 
     buttonsDiv.appendChild(approveButton);

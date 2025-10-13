@@ -31,7 +31,7 @@ function App () {
       const targetNode = nodesRef.current.find(node => node.id.includes(headHash));
       if (targetNode) {
         setChatbotPosition({
-          x: targetNode.position.x + 50,
+          x: targetNode.position.x + 150, // Increased from 50 to 150 to position chatbot between parent and subtasks
           y: targetNode.position.y
         });
       }
@@ -55,7 +55,8 @@ function App () {
       console.log("Chatbot is visible. Moving nodes...");
       setNodes(prevNodes =>
         prevNodes.map(node => {
-          if (node.position.x > chatbotPosition.x - 50) {
+          // Move nodes that are to the right of chatbot and not the chatbot itself
+          if (node.position.x > chatbotPosition.x + 200 && node.id !== 'chatbot-node') {
             if (!movedNodesRef.current.has(node.id)) {
               console.log(`Saving original position of node ${node.id}: ${node.position.x}`);
               movedNodesRef.current.set(node.id, node.position.x); // Save original position
@@ -64,7 +65,7 @@ function App () {
               ...node,
               position: {
                 ...node.position,
-                x: node.position.x + 400, // Shift node to the right
+                x: node.position.x + 400, // Shift node to the right to avoid chatbot
               },
             };
           }
@@ -112,6 +113,7 @@ function App () {
   }, [message]);
 
   // Show chatbot when confirm_best_match_decomposition message is received
+  // Keep chatbot visible until a different message type arrives
   useEffect(() => {
     if (message && message.type === 'confirm_best_match_decomposition') {
       setShowChatbot(true);
@@ -169,17 +171,19 @@ function App () {
             id: 'chatbot-node',
             type: 'chatbot',
             position: {
-              x: chatbotPosition.x+150,
-              y: chatbotPosition.y - 200, // Offset the chatbot's vertical position by 200 units
+              x: chatbotPosition.x + 100,
+              y: chatbotPosition.y - 200,
             },
             data: { socket, message },
             draggable: false,
             selectable: false,
+            sourcePosition: 'right',
+            targetPosition: 'left',
           }
         ];
       });
     }
-  }, [showChatbot, message, chatbotPosition]); // include chatbotPosition for position updates  
+  }, [showChatbot, message, chatbotPosition]);  
 
   // Remove chatbot node when showChatbot becomes false
   useEffect(() => {
@@ -210,6 +214,7 @@ function App () {
               setNodes={setNodes}
               setEdges={setEdges}
               socket={socket}
+              readOnly={showChatbot}
             />
           )}
           {message?.type === 'display_added_method' && (
