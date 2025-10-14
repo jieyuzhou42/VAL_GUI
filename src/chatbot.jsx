@@ -249,11 +249,14 @@ Is it correct?`);
     approveButton.innerHTML = '✓ Approve';
     approveButton.style.marginRight = '10px';
     approveButton.onclick = () => {
-      console.log('Grounding approve button clicked, sending response...');
-      socket.emit('message', {
-        type: 'response_decomposition_with_edit',
-        response: { user_choice: 'approve', index: 0 }
+      console.log('Chatbot approve button clicked, triggering decomposition action...');
+      
+      // Trigger the tree component's handleConfirm via custom event
+      const event = new CustomEvent('chatbot_decomposition_action', {
+        detail: { action: 'approve', index: 0 }
       });
+      window.dispatchEvent(event);
+      
       // Disable and fade out buttons after clicking
       approveButton.disabled = true;
       rejectButton.disabled = true;

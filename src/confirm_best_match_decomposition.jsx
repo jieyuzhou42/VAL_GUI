@@ -339,35 +339,18 @@ useEffect(() => {
       return;
     }
 
-    // Declare yesNode outside the if block so it's accessible later
-    let yesNode;
-
-    // Always create yesNode as an invisible junction point for edge connections
-    // This serves as the split point: chatbot → yesNode → subtasks
-    yesNode = {
-      id: `${data.head.hash}-unhide-0`,
-      position: {
-        x: parentNode.position.x + 200,
-        y: parentNode.position.y + 3.5
-      },
-      data: { label: '' }, // Empty label makes it invisible
-      style: {
-        background: 'transparent',
-        border: 'none',
-        width: '1px',
-        height: '1px',
-      },
-      sourcePosition: 'right',
-      targetPosition: 'left',
+    // No approve/reject buttons in GUI anymore - all handled by chatbot
+    // Just use a dummy yesNode for layout calculations
+      const yesNode = {
+        id: `${data.head.hash}-unhide-0`,
+        position: { 
+          x: parentNode.position.x + 200, 
+          y: parentNode.position.y + 3.5
+      }
     };
 
     const newNodes = [];
     const newEdges = [];
-    
-    // Add the invisible junction node if it doesn't exist
-    if (!nodes.some(node => node.id === yesNode.id)) {
-      newNodes.push(yesNode);
-    }
 
     // Create child nodes for each subtask
     data.subtasks[0].forEach((task, subIndex) => {
@@ -401,11 +384,14 @@ useEffect(() => {
 
       newNodes.push(taskNode);
 
-      // Add edge from yesNode (invisible junction point) to task node
-      // yesNode serves as the split point where one line from chatbot becomes multiple lines to subtasks
+      // Check if chatbot node exists to determine edge routing
+      const chatbotNode = nodes.find(n => n.id === 'chatbot-node');
+      
+      if (chatbotNode) {
+        // If chatbot exists, connect from chatbot to subtasks
       newEdges.push({
-        id: `e-${yesNode.id}-${taskNode.id}`,
-        source: yesNode.id,
+          id: `e-chatbot-${taskNode.id}`,
+          source: 'chatbot-node',
         target: `${taskNode.id}`,
         markerEnd: {
           type: MarkerType.Arrow,
@@ -416,7 +402,24 @@ useEffect(() => {
           strokeWidth: 2,
           stroke: currentEdgeColor,
         },
-      });
+        });
+      } else {
+        // No chatbot: connect directly from parent to subtasks
+        newEdges.push({
+          id: `e-${parentNode.id}-${taskNode.id}`,
+          source: parentNode.id,
+          target: `${taskNode.id}`,
+          markerEnd: {
+            type: MarkerType.Arrow,
+            strokeWidth: 2,
+            color: currentEdgeColor,
+          },
+          style: {
+            strokeWidth: 2,
+            stroke: currentEdgeColor,
+          },
+        });
+      }
 
       // if (subIndex === 0) {
       // Add edit button next to the task node
@@ -453,21 +456,18 @@ useEffect(() => {
   setEdges(prev => [...prev, ...newEdges]);
   }, [data]);
   
-  // Effect 1.5: Add edges for chatbot flow when chatbot appears
-  // Creates: parent → chatbot → junction point (yesNode)
+  // Effect 1.5: Add edge from parent to chatbot when chatbot appears
   useEffect(() => {
     const chatbotNode = nodes.find(n => n.id === 'chatbot-node');
     const parentNode = nodes.find(n => n.id.includes(data.head.hash));
-    const junctionNode = nodes.find(n => n.id === `${data.head.hash}-unhide-0`);
     
     if (chatbotNode && parentNode) {
-      // Edge 1: parent → chatbot
-      const edge1Id = `e-${parentNode.id}-chatbot`;
-      const edge1Exists = edges.some(e => e.id === edge1Id);
+      const edgeId = `e-${parentNode.id}-chatbot`;
+      const edgeExists = edges.some(e => e.id === edgeId);
       
-      if (!edge1Exists) {
+      if (!edgeExists) {
         setEdges(prev => [...prev, {
-          id: edge1Id,
+          id: edgeId,
           source: parentNode.id,
           target: 'chatbot-node',
           markerEnd: {
@@ -481,32 +481,36 @@ useEffect(() => {
           },
         }]);
       }
-      
-      // Edge 2: chatbot → junction point (invisible yesNode)
-      // This creates the single line out from chatbot before it splits to subtasks
-      if (junctionNode) {
-        const edge2Id = `e-chatbot-${junctionNode.id}`;
-        const edge2Exists = edges.some(e => e.id === edge2Id);
-        
-        if (!edge2Exists) {
-          setEdges(prev => [...prev, {
-            id: edge2Id,
-            source: 'chatbot-node',
-            target: junctionNode.id,
-            markerEnd: {
-              type: MarkerType.Arrow,
-              strokeWidth: 2,
-              color: currentEdgeColor,
-            },
-            style: {
-              strokeWidth: 2,
-              stroke: currentEdgeColor,
-            },
-          }]);
-        }
-      }
     }
-  }, [nodes.find(n => n.id === 'chatbot-node'), nodes.find(n => n.id === `${data.head.hash}-unhide-0`)]);
+  }, [nodes.find(n => n.id === 'chatbot-node')]); // Only re-run when chatbot node appears
+  
+  // Effect 1.6: Listen for chatbot approve/reject and trigger handleConfirm
+  useEffect(() => {
+    const handleChatbotAction = (event) => {
+      const { action, index } = event.detail;
+      console.log('Chatbot action received:', action, 'index:', index);
+      
+      const parentNode = nodes.find(n => n.id.includes(data.head.hash));
+      const yesNode = {
+        id: `${data.head.hash}-unhide-0`,
+        position: {
+          x: parentNode?.position.x + 200 || 200,
+          y: parentNode?.position.y + 3.5 || 3.5
+        }
+      };
+      
+      if (action === 'approve' && parentNode) {
+        handleConfirm(yesNode, index || 0, parentNode);
+      }
+      // Reject is handled by chatbot directly (showing More Options, etc.)
+    };
+    
+    window.addEventListener('chatbot_decomposition_action', handleChatbotAction);
+    
+    return () => {
+      window.removeEventListener('chatbot_decomposition_action', handleChatbotAction);
+    };
+  }, [nodes, data, edges]);
   
   // Effect 2: render remaining options when showAllOptions===true
   useEffect(() => {

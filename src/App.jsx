@@ -113,7 +113,6 @@ function App () {
   }, [message]);
 
   // Show chatbot when confirm_best_match_decomposition message is received
-  // Keep chatbot visible until a different message type arrives
   useEffect(() => {
     if (message && message.type === 'confirm_best_match_decomposition') {
       setShowChatbot(true);
@@ -214,7 +213,7 @@ function App () {
               setNodes={setNodes}
               setEdges={setEdges}
               socket={socket}
-              readOnly={showChatbot}
+              readOnly={false}
             />
           )}
           {message?.type === 'display_added_method' && (

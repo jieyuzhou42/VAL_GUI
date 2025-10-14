@@ -1,11 +1,15 @@
 import React from 'react';
-import { ReactFlow } from '@xyflow/react';
+import { ReactFlow, Handle, Position } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import Chatbot from './chatbot';
 
 const nodeTypes = {
   chatbot: ({ data }) => (
-    <div><Chatbot socket={data.socket} message={data.message} /></div>
+    <div style={{ position: 'relative' }}>
+      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+      <Chatbot socket={data.socket} message={data.message} />
+      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
+    </div>
   )
 };
 
