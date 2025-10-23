@@ -36,9 +36,10 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
         // hide the nodes that are not connected to the parent node
         setNodes(prevNodes => prevNodes.map(node => {
           if (node.position.x >= (parentNode.position.x + 200)) {
-            if (node.id.includes('unhide')) {
-              return { ...node, hidden: false };
-            }
+            // Don't show unhide (approve) buttons - user already approved via chatbot
+            // if (node.id.includes('unhide')) {
+            //   return { ...node, hidden: false };
+            // }
             return { ...node, hidden: true };
           }
           if (edges.some(edge => edge.source === parentNodeId && edge.target === node.id)) {
@@ -129,78 +130,27 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
         return;
       }
   
-      // Add yes node
-      const yesNode = {
-        id: `${data.head.hash}-unhide-0`,
-        // position: { x: parentNode.position.x + 250, y: parentNode.position.y },
-        position: { 
-          x: parentNode.position.x + 200, 
-          y: parentNode.position.y + 3.5
-        },
-        data: { 
-          label: "✓ Approve", 
-          onClick: () => handleConfirm(yesNode,0,parentNode) 
-        },
-        style: {
-          background: '#95B9F3', 
-          width: '70px',
-          height: '32px',
-          borderRadius: '16px',
-          border: 'none',
-          fontSize: '10px',
-          // fontWeight: '500',
-        },
-        sourcePosition: 'right',
-        targetPosition: 'left',
-      }
-  
-      
-      if (!nodes.some(node => node.id === yesNode.id)) {
-        setNodes(prev => [...prev, yesNode]);
-      } else {
-        setNodes(prev => prev.map(node => {
-          if (node.id === yesNode.id) {
-            return { ...node,  
-              data: { 
-                label: "✓ Approve",
-                onClick: () => handleConfirm(yesNode,0,parentNode) 
-              }, 
-            };
-          }
-          return node;
-        }));
-      }
-  
-      // Add edge from parent node to yes nodes
-      setEdges(prev => [...prev, {
-        id: `e-${parentNode.id}-${yesNode.id}`,
-        source: parentNode.id,
-        target: yesNode.id,
-        markerEnd: {
-          type: MarkerType.Arrow,
-          strokeWidth: 2,
-          color: currentEdgeColor
-        },
-        style: {
-          strokeWidth: 2,
-          stroke: currentEdgeColor
-        },
-        // debugging
-        // label: `e-${parentNode.id}-${yesNode.id}`,
-      }]);
-  
+      // User already approved via chatbot, so we don't need approve button
+      // Just proceed to showing subtasks directly connected to parent
   
       console.log(" Creating child node.", nodes);
       const newNodes = [];
       const newEdges = [];
+      
+      // Use same yesNode position logic as confirm_best_match_decomposition
+      // yesNode.x = parent.x + 300 (aligns with placeholder position)
+      const yesNodeX = parentNode.position.x + 300;
+      
+      // Find chatbot-placeholder once, outside the loop
+      const chatbotPlaceholder = nodes.find(n => n.id === 'chatbot-placeholder');
   
       // Create child nodes for each subtask
       data.subtasks[0].forEach((task, subIndex) => {
         const taskNode = {
           id: task.hash,
           position: { 
-            x: yesNode.position.x + 150, 
-            y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
+            x: yesNodeX + 450, // Same as confirm_best_match: yesNode.x + 450
+            y: parentNode.position.y + subIndex * 50 // Consistent vertical spacing
           },
           data: { 
             label: `${task.task_name} ${task.args}`,
@@ -228,10 +178,11 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
   
         console.log('taskNode background:', taskNode?.style?.background);
   
-        // Add edge from yes node to task node
+        // Add edge from chatbot-placeholder (if exists) or parent to task node
+        const sourceNode = chatbotPlaceholder || parentNode;
         newEdges.push({
-          id: `e-${parentNode.id}-unhide-${taskNode.id}`,
-          source: yesNode.id,
+          id: `e-${sourceNode.id}-${taskNode.id}`,
+          source: sourceNode.id,
           target: `${taskNode.id}`,
           markerEnd: {
             type: MarkerType.Arrow,
@@ -242,13 +193,41 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
             strokeWidth: 2,
             stroke: currentEdgeColor,
           },
-          // debugging
-          // label: `e-${parentNode.id}-unhide-${taskNode.id}`,
         });
       });
   
     setNodes(prev => [...prev, ...newNodes]);
-    setEdges(prev => [...prev, ...newEdges]);
+    setEdges(prev => {
+      const updatedEdges = [...prev, ...newEdges];
+      
+      // If there's a chatbot-placeholder, add edge from parent to placeholder
+      if (chatbotPlaceholder) {
+        const placeholderEdgeId = `e-${parentNode.id}-${chatbotPlaceholder.id}`;
+        if (!updatedEdges.some(e => e.id === placeholderEdgeId)) {
+          updatedEdges.push({
+            id: placeholderEdgeId,
+            source: parentNode.id,
+            target: chatbotPlaceholder.id,
+            markerEnd: {
+              type: MarkerType.Arrow,
+              strokeWidth: 2,
+              color: currentEdgeColor,
+            },
+            style: {
+              strokeWidth: 2,
+              stroke: currentEdgeColor,
+            },
+          });
+        }
+      }
+      
+      return updatedEdges;
+    });
+    
+    // User already approved via chatbot, automatically send response to backend
+    // to continue the flow
+    console.log("Automatically sending response_decomposition to continue flow...");
+    socket.emit("message", { type: 'response_decomposition', response: 0 });
     }, [data]);
 
     const updateNodesAndEdges = () => {

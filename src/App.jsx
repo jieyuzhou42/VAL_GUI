@@ -16,6 +16,7 @@ function App () {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [chatbotPosition, setChatbotPosition] = useState({ x: 50, y: 50 });
+  const [lastMessageType, setLastMessageType] = useState(null); // Track previous message type for placeholder
   const nodesRef = useRef([]);
   // these are constants that pass through each components
   // all components just make changes to these constants
@@ -31,7 +32,7 @@ function App () {
       const targetNode = nodesRef.current.find(node => node.id.includes(headHash));
       if (targetNode) {
         setChatbotPosition({
-          x: targetNode.position.x + 150, // Increased from 50 to 150 to position chatbot between parent and subtasks
+          x: targetNode.position.x + 200, // Increased to 200 for better spacing
           y: targetNode.position.y
         });
       }
@@ -65,7 +66,7 @@ function App () {
               ...node,
               position: {
                 ...node.position,
-                x: node.position.x + 400, // Shift node to the right to avoid chatbot
+                x: node.position.x + 340, // Shift node by chatbot width (340px)
               },
             };
           }
@@ -77,16 +78,22 @@ function App () {
       console.log("Chatbot is hidden. Restoring nodes...");
       console.log("Nodes before restoring:", nodes.map(node => ({ id: node.id, x: node.position.x })));
       console.log("Moved nodes before restoring:", Array.from(movedNodesRef.current.entries()));
+      
+      // Check if placeholder exists
+      const hasPlaceholder = nodes.some(n => n.id === 'chatbot-placeholder');
+      const placeholderOffset = hasPlaceholder ? 60 : 0; // 40px placeholder + 20px gap
   
       // Force state update with restored nodes
       const restoredNodes = nodes.map(node => {
         if (movedNodesRef.current.has(node.id)) {
-          console.log(`Restoring node ${node.id} to original x: ${movedNodesRef.current.get(node.id)}`);
+          const originalX = movedNodesRef.current.get(node.id);
+          const newX = originalX + placeholderOffset;
+          console.log(`Restoring node ${node.id} to x: ${newX} (original: ${originalX}, offset: ${placeholderOffset})`);
           return {
             ...node,
             position: {
               ...node.position,
-              x: movedNodesRef.current.get(node.id), // Restore original x position
+              x: newX, // Restore with placeholder offset if exists
             },
           };
         }
@@ -96,60 +103,51 @@ function App () {
       console.log("Restored nodes:", restoredNodes.map(node => ({ id: node.id, x: node.position.x })));
       setNodes(restoredNodes); // Apply restored nodes to state
   
-      // Check after state update
-      setTimeout(() => {
-        console.log("Nodes after restoring:", nodes.map(node => ({ id: node.id, x: node.position.x })));
-        console.log("Clearing movedNodesRef...");
-        movedNodesRef.current.clear(); // Clear the record of moved nodes
-        console.log("Moved nodes after clearing:", Array.from(movedNodesRef.current.entries()));
-      }, 0); // Check logs after state update
+      // Only clear movedNodesRef when placeholder doesn't exist
+      if (!hasPlaceholder) {
+        setTimeout(() => {
+          console.log("Nodes after restoring:", nodes.map(node => ({ id: node.id, x: node.position.x })));
+          console.log("Clearing movedNodesRef...");
+          movedNodesRef.current.clear(); // Clear the record of moved nodes
+          console.log("Moved nodes after clearing:", Array.from(movedNodesRef.current.entries()));
+        }, 0); // Check logs after state update
+      }
     }
   }, [showChatbot, chatbotPosition]);
   
+  // Handle all message types in one effect
   useEffect(() => {
-    if (message?.type === 'display_added_method') {
-      setShowChatbot(false); // Hide the chatbot
-    }
-  }, [message]);
-
-  // Show chatbot when confirm_best_match_decomposition message is received
-  useEffect(() => {
-    if (message && message.type === 'confirm_best_match_decomposition') {
+    if (!message) return;
+    
+    const messageType = message.type;
+    
+    // Messages that should show chatbot
+    const showChatbotTypes = [
+      'confirm_best_match_decomposition',
+      'display_thinking_analysis',
+      'show_thinking_analysis_and_decomposition',
+      'ask_subtasks',
+      'segment_confirmation'
+    ];
+    
+    // Messages that should show placeholder when chatbot is hidden
+    const placeholderTypes = [
+      'confirm_best_match_decomposition',
+      'display_added_method'
+    ];
+    
+    if (showChatbotTypes.includes(messageType)) {
       setShowChatbot(true);
-    }
-  }, [message]);
-
-  // Show chatbot when thinking analysis message is received
-  useEffect(() => {
-    if (message && message.type === 'display_thinking_analysis') {
-      setShowChatbot(true);
-    }
-  }, [message]);
-
-  // Show chatbot when show thinking analysis and decomposition message is received
-  useEffect(() => {
-    if (message && message.type === 'show_thinking_analysis_and_decomposition') {
-      setShowChatbot(true);
-    }
-  }, [message]);
-
-  // Show chatbot when ask_subtasks message is received
-  useEffect(() => {
-    if (message?.type === 'ask_subtasks') {
-      setShowChatbot(true);
-    }
-  }, [message]);
-
-  useEffect(() => {
-    if (message?.type === 'segment_confirmation') {
-      setShowChatbot(true);
-    }
-  }, [message]);
-
-  useEffect(() => {
-    if (message?.type === 'request_user_task') {
+      if (placeholderTypes.includes(messageType)) {
+        setLastMessageType(messageType); // Remember for placeholder
+      }
+    } else if (messageType === 'display_added_method') {
+      setShowChatbot(false); // Hide chatbot, show placeholder
+      setLastMessageType(messageType);
+    } else if (messageType === 'request_user_task') {
       setNodes([]);
       setEdges([]);
+      setLastMessageType(null); // Clear placeholder context
     }
   }, [message]);
   
@@ -163,7 +161,14 @@ function App () {
   useEffect(() => {
     if (showChatbot) {
       setNodes(prevNodes => {
-        const otherNodes = prevNodes.filter(n => n.id !== 'chatbot-node');
+        const otherNodes = prevNodes.filter(n => n.id !== 'chatbot-node' && n.id !== 'chatbot-placeholder');
+        
+        // Calculate vertical center: align chatbot with middle of parent and subtasks
+        // Assuming subtasks span from parent.y to parent.y + (n-1)*50
+        // For now, use a reasonable offset that centers the chatbot window
+        const chatbotWindowHeight = 500; // From chat.css
+        const verticalOffset = chatbotWindowHeight / 2; // Center of chatbot window
+        
         return [
           ...otherNodes,
           {
@@ -171,7 +176,7 @@ function App () {
             type: 'chatbot',
             position: {
               x: chatbotPosition.x + 100,
-              y: chatbotPosition.y - 200,
+              y: chatbotPosition.y - verticalOffset + 16, // Align center of chatbot with parent/subtasks middle
             },
             data: { socket, message },
             draggable: false,
@@ -184,12 +189,50 @@ function App () {
     }
   }, [showChatbot, message, chatbotPosition]);  
 
-  // Remove chatbot node when showChatbot becomes false
+  // Remove chatbot and add placeholder when showChatbot becomes false
   useEffect(() => {
-    if (!showChatbot) {
-      setNodes(prev => prev.filter(n => n.id !== 'chatbot-node'));
+    const shouldShowPlaceholder = !showChatbot && 
+      (lastMessageType === 'confirm_best_match_decomposition' || lastMessageType === 'display_added_method');
+    
+    if (shouldShowPlaceholder) {
+      setNodes(prev => {
+        const filtered = prev.filter(n => n.id !== 'chatbot-node');
+        // Add placeholder if it doesn't exist
+        if (!filtered.some(n => n.id === 'chatbot-placeholder')) {
+          return [
+            ...filtered,
+            {
+              id: 'chatbot-placeholder',
+              position: {
+                x: chatbotPosition.x + 100,
+                y: chatbotPosition.y + 5, // Slightly offset for better visual alignment
+              },
+              data: { label: '···' },
+              style: {
+                background: 'rgb(236, 243, 254)',
+                border: 'none',
+                borderRadius: '8px',
+                width: '40px',
+                height: '32px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                fontSize: '16px',
+                color: '#666',
+                padding: '0',
+              },
+              sourcePosition: 'right',
+              targetPosition: 'left',
+            }
+          ];
+        }
+        return filtered;
+      });
+    } else if (!showChatbot) {
+      // If not showing placeholder, remove both chatbot and placeholder
+      setNodes(prev => prev.filter(n => n.id !== 'chatbot-node' && n.id !== 'chatbot-placeholder'));
     }
-  }, [showChatbot]);
+  }, [showChatbot, lastMessageType, chatbotPosition]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh' }}>

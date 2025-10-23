@@ -136,12 +136,10 @@ function Chatbot({ socket, message }) {
     appendMessage("VAL", valPic, "left", displayText);
   }
 
-  function formatAnalysisText(text) {
-    // Convert markdown-style formatting to HTML
+  function formatAnalysisTextSimple(text) {
+    // Simple formatting for thinking analysis
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`(.*?)`/g, '<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px;">$1</code>')
-      .replace(/\n\n/g, '<br><br>')
       .replace(/\n/g, '<br>');
   }
 
@@ -161,13 +159,6 @@ function Chatbot({ socket, message }) {
       .replace(/\n/g, '<br>');
   }
 
-  function formatAnalysisText(text) {
-    // Convert markdown-style formatting to HTML
-    return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br>');
-  }
-
   function displayThinkingAnalysis(message) {
     console.log('displayThinkingAnalysis called with message:', message);
     const data = message.text;
@@ -179,7 +170,7 @@ function Chatbot({ socket, message }) {
     console.log('Thinking analysis data:', { userTask, taskName, taskArgs, analysisText });
     
     // Format the analysis text
-    const formattedText = formatAnalysisText(analysisText);
+    const formattedText = formatAnalysisTextSimple(analysisText);
     
     // Create approve/reject buttons for grounding confirmation
     const buttonsDiv = document.createElement('div');
@@ -233,7 +224,7 @@ function Chatbot({ socket, message }) {
     console.log('Thinking analysis and decomposition data:', { userTask, taskName, taskArgs, analysisText });
     
     // Format the analysis text (use the one from backend if available)
-    const formattedText = formatAnalysisText(analysisText || `Thinking...
+    const formattedText = formatAnalysisTextSimple(analysisText || `Thinking...
 
 Based on your input "${userTask}", I understood this as the action: ${taskName}(${taskArgs ? taskArgs.join(', ') : ''}).
 
@@ -249,9 +240,10 @@ Is it correct?`);
     approveButton.innerHTML = '✓ Approve';
     approveButton.style.marginRight = '10px';
     approveButton.onclick = () => {
-      console.log('Chatbot approve button clicked, triggering decomposition action...');
+      console.log('Chatbot approve button clicked, triggering tree action...');
       
       // Trigger the tree component's handleConfirm via custom event
+      // The tree component will send the socket message
       const event = new CustomEvent('chatbot_decomposition_action', {
         detail: { action: 'approve', index: 0 }
       });
@@ -279,54 +271,11 @@ Is it correct?`);
       approveButton.style.cursor = 'not-allowed';
       rejectButton.style.cursor = 'not-allowed';
       
-      // Create a new row for "More Options" and "+ Create Method" buttons
-      const secondRowDiv = document.createElement('div');
-      secondRowDiv.className = 'chatbot-container buttons';
-      secondRowDiv.style.marginTop = '10px';
-      
-      const moreOptionsButton = document.createElement('button');
-      moreOptionsButton.innerHTML = 'More Options';
-      moreOptionsButton.style.marginRight = '10px';
-      moreOptionsButton.style.background = 'rgb(236, 243, 254)';
-      moreOptionsButton.style.border = 'none';
-      moreOptionsButton.style.borderRadius = '16px';
-      moreOptionsButton.style.padding = '8px 16px';
-      moreOptionsButton.style.cursor = 'pointer';
-      moreOptionsButton.onclick = () => {
-        console.log('More Options clicked - this will show all decomposition options');
-        // This will trigger showing all options in the tree
-        // You can emit a message to trigger tree expansion if needed
-      };
-      
-      const createMethodButton = document.createElement('button');
-      createMethodButton.innerHTML = '+ Create Method';
-      createMethodButton.style.background = 'rgb(236, 243, 254)';
-      createMethodButton.style.border = 'none';
-      createMethodButton.style.borderRadius = '16px';
-      createMethodButton.style.padding = '8px 16px';
-      createMethodButton.style.cursor = 'pointer';
-      createMethodButton.onclick = () => {
-        console.log('Create Method clicked from chatbot, emitting start_gui_create_method event');
-        // Emit a custom event that the tree component can listen to
-        // This will trigger the tree to show editable nodes
-        const event = new CustomEvent('start_gui_create_method', {
-          detail: { fromChatbot: true }
-        });
-        window.dispatchEvent(event);
-        moreOptionsButton.disabled = true;
-        createMethodButton.disabled = true;
-        moreOptionsButton.style.opacity = '0.3';
-        createMethodButton.style.opacity = '0.3';
-      };
-      
-      secondRowDiv.appendChild(moreOptionsButton);
-      secondRowDiv.appendChild(createMethodButton);
-      
-      // Append the second row to the same message bubble
-      const lastMsgBubble = document.querySelector('.chatbot-container-msg.msg.left-msg:last-child .msg-bubble');
-      if (lastMsgBubble) {
-        lastMsgBubble.appendChild(secondRowDiv);
-      }
+      // Trigger showing all method options in the tree
+      const event = new CustomEvent('chatbot_show_all_methods', {
+        detail: { action: 'show_all' }
+      });
+      window.dispatchEvent(event);
     };
 
     buttonsDiv.appendChild(approveButton);

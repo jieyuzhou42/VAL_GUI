@@ -29,6 +29,8 @@ function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
   // console.log("nodes in ConfirmDecomp:", nodes);
   // console.log('edges in ConfirmDecomp:', edges);
   const [showAllOptions, setShowAllOptions] = useState(false);
+  const [selectedMethodIndex, setSelectedMethodIndex] = useState(0); // Track selected method
+  const [isEditMode, setIsEditMode] = useState(false); // Track if in edit mode
   const edgesRef = useRef(edges);
   const nodesRef = useRef([]);
 
@@ -239,8 +241,9 @@ useEffect(() => {
       // hide the nodes that are not connected to the parent node
       setNodes(prevNodes => prevNodes.map(node => {
         if (node.position.x >= (parentNode.position.x + 200)) {
+          // Don't auto-unhide approve buttons - they should only appear in "More Options" mode
           if (node.id.includes('unhide')) {
-            return { ...node, hidden: false };
+            return { ...node, hidden: true }; // Keep approve buttons hidden by default
           }
           return { ...node, hidden: true };
         }
@@ -263,9 +266,10 @@ useEffect(() => {
     // set the nodes color
     setNodes(prevNodes => prevNodes.map(node => {
       if (node.id.includes('unhide')) {
-        // for the yes node, make the background color none
+        // Hide all approve buttons by default (only show in More Options mode)
         return {
           ...node,
+          hidden: true,
           style: {
             ...node.style,
             background: 'none',
@@ -340,12 +344,13 @@ useEffect(() => {
     }
 
     // No approve/reject buttons in GUI anymore - all handled by chatbot
-    // Just use a dummy yesNode for layout calculations
-      const yesNode = {
-        id: `${data.head.hash}-unhide-0`,
-        position: { 
-          x: parentNode.position.x + 200, 
-          y: parentNode.position.y + 3.5
+    // yesNode position should align with chatbot-placeholder position for consistency
+    // placeholder.x = chatbotPosition.x + 100 = (parent.x + 200) + 100 = parent.x + 300
+    const yesNode = {
+      id: `${data.head.hash}-unhide-0`,
+      position: { 
+        x: parentNode.position.x + 300, // Align with placeholder position
+        y: parentNode.position.y + 3.5
       }
     };
 
@@ -357,8 +362,8 @@ useEffect(() => {
       const taskNode = {
         id: task.hash,
         position: { 
-          x: yesNode.position.x + 300, // Increased from 150 to 300 to avoid chatbot overlap
-          y: parentNode.position.y + subIndex * (150 / (parentNode.position.x / 200 + 1))
+          x: yesNode.position.x + 450, // Increased to 450 for better spacing from chatbot
+          y: parentNode.position.y + subIndex * 50 // Vertical spacing between subtasks, aligned with parent
         },
         data: { 
           label: `${task.task_name} ${task.args}`,
@@ -384,8 +389,9 @@ useEffect(() => {
 
       newNodes.push(taskNode);
 
-      // Check if chatbot node exists to determine edge routing
+      // Check if chatbot or placeholder node exists to determine edge routing
       const chatbotNode = nodes.find(n => n.id === 'chatbot-node');
+      const placeholderNode = nodes.find(n => n.id === 'chatbot-placeholder');
       
       if (chatbotNode) {
         // If chatbot exists, connect from chatbot to subtasks
@@ -403,8 +409,24 @@ useEffect(() => {
           stroke: currentEdgeColor,
         },
         });
+      } else if (placeholderNode) {
+        // If placeholder exists, connect from placeholder to subtasks
+        newEdges.push({
+          id: `e-placeholder-${taskNode.id}`,
+          source: 'chatbot-placeholder',
+          target: `${taskNode.id}`,
+          markerEnd: {
+            type: MarkerType.Arrow,
+            strokeWidth: 2,
+            color: currentEdgeColor,
+          },
+          style: {
+            strokeWidth: 2,
+            stroke: currentEdgeColor,
+          },
+        });
       } else {
-        // No chatbot: connect directly from parent to subtasks
+        // No chatbot or placeholder: connect directly from parent to subtasks
         newEdges.push({
           id: `e-${parentNode.id}-${taskNode.id}`,
           source: parentNode.id,
@@ -456,33 +478,56 @@ useEffect(() => {
   setEdges(prev => [...prev, ...newEdges]);
   }, [data]);
   
-  // Effect 1.5: Add edge from parent to chatbot when chatbot appears
+  // Effect 1.5: Add edge from parent to chatbot or placeholder when they appear
   useEffect(() => {
     const chatbotNode = nodes.find(n => n.id === 'chatbot-node');
+    const placeholderNode = nodes.find(n => n.id === 'chatbot-placeholder');
     const parentNode = nodes.find(n => n.id.includes(data.head.hash));
     
-    if (chatbotNode && parentNode) {
-      const edgeId = `e-${parentNode.id}-chatbot`;
-      const edgeExists = edges.some(e => e.id === edgeId);
-      
-      if (!edgeExists) {
-        setEdges(prev => [...prev, {
-          id: edgeId,
-          source: parentNode.id,
-          target: 'chatbot-node',
-          markerEnd: {
-            type: MarkerType.Arrow,
-            strokeWidth: 2,
-            color: currentEdgeColor,
-          },
-          style: {
-            strokeWidth: 2,
-            stroke: currentEdgeColor,
-          },
-        }]);
+    if (parentNode) {
+      if (chatbotNode) {
+        const edgeId = `e-${parentNode.id}-chatbot`;
+        const edgeExists = edges.some(e => e.id === edgeId);
+        
+        if (!edgeExists) {
+          setEdges(prev => [...prev, {
+            id: edgeId,
+            source: parentNode.id,
+            target: 'chatbot-node',
+            markerEnd: {
+              type: MarkerType.Arrow,
+              strokeWidth: 2,
+              color: currentEdgeColor,
+            },
+            style: {
+              strokeWidth: 2,
+              stroke: currentEdgeColor,
+            },
+          }]);
+        }
+      } else if (placeholderNode) {
+        const edgeId = `e-${parentNode.id}-placeholder`;
+        const edgeExists = edges.some(e => e.id === edgeId);
+        
+        if (!edgeExists) {
+          setEdges(prev => [...prev, {
+            id: edgeId,
+            source: parentNode.id,
+            target: 'chatbot-placeholder',
+            markerEnd: {
+              type: MarkerType.Arrow,
+              strokeWidth: 2,
+              color: currentEdgeColor,
+            },
+            style: {
+              strokeWidth: 2,
+              stroke: currentEdgeColor,
+            },
+          }]);
+        }
       }
     }
-  }, [nodes.find(n => n.id === 'chatbot-node')]); // Only re-run when chatbot node appears
+  }, [nodes.find(n => n.id === 'chatbot-node'), nodes.find(n => n.id === 'chatbot-placeholder')]); // Re-run when chatbot or placeholder appears
   
   // Effect 1.6: Listen for chatbot approve/reject and trigger handleConfirm
   useEffect(() => {
@@ -494,7 +539,7 @@ useEffect(() => {
       const yesNode = {
         id: `${data.head.hash}-unhide-0`,
         position: {
-          x: parentNode?.position.x + 200 || 200,
+          x: parentNode?.position.x + 250 || 250,
           y: parentNode?.position.y + 3.5 || 3.5
         }
       };
@@ -505,106 +550,195 @@ useEffect(() => {
       // Reject is handled by chatbot directly (showing More Options, etc.)
     };
     
+    const handleShowAllMethods = (event) => {
+      console.log('Show all methods triggered');
+      setShowAllOptions(true);
+    };
+    
     window.addEventListener('chatbot_decomposition_action', handleChatbotAction);
+    window.addEventListener('chatbot_show_all_methods', handleShowAllMethods);
     
     return () => {
       window.removeEventListener('chatbot_decomposition_action', handleChatbotAction);
+      window.removeEventListener('chatbot_show_all_methods', handleShowAllMethods);
     };
   }, [nodes, data, edges]);
   
-  // Effect 2: render remaining options when showAllOptions===true
+  // Effect 2: render all method options when showAllOptions===true
   useEffect(() => {
     if (!showAllOptions) return;
-    // find parent
     const parentNode = nodes.find(n => n.id === data.head.hash);
-    let totalMethodCount = 0;
     if (!parentNode) return;
-    // render for subtasks 1..end
+    
+    console.log('Rendering all method options, total methods:', data.subtasks.length);
+    
+    // Find the chatbot-placeholder to align with it (same X as best match)
+    const chatbotPlaceholder = nodes.find(n => n.id === 'chatbot-placeholder');
+    const selectButtonX = chatbotPlaceholder ? chatbotPlaceholder.position.x : parentNode.position.x + 300;
+    
+    // Calculate the bottom Y position of best match subtasks
+    const bestMatchSubtasks = data.subtasks[0] || [];
+    const bestMatchBottomY = parentNode.position.y + (bestMatchSubtasks.length - 1) * 50;
+    const startingYOffset = 100; // Gap between best match and first other method
+    
+    // Best match (index 0) already rendered, start from index 1
     data.subtasks.slice(1).forEach((option, idx) => {
-      const realIndex = idx + 1;
-      const baseY = parentNode.position.y + 3.5;
-      const yesNodeId = `${data.head.hash}-unhide-${realIndex}`;
-      const yesNode = { id: yesNodeId, 
-        position: { 
-          x: parentNode.position.x + 200, 
-          y: baseY + idx * 100 }, 
+      const realIdx = idx + 1; // Actual index in data.subtasks
+      // Calculate Y position: below best match + spacing for previous other methods
+      const previousMethodsHeight = idx > 0 ? data.subtasks.slice(1, realIdx - 1).reduce((sum, opt) => sum + opt.length * 50 + 50, 0) : 0;
+      const baseY = bestMatchBottomY + startingYOffset + previousMethodsHeight;
+      const selectNodeId = `${data.head.hash}-select-${realIdx}`;
+      
+      // Create Select button for this method
+      const selectNode = {
+        id: selectNodeId,
+        position: {
+          x: selectButtonX,
+          y: baseY
+        },
         data: { 
-          label: "✓ Approve", 
-          onClick: () => handleConfirm(yesNode, realIndex,parentNode) 
+          label: realIdx === selectedMethodIndex ? "● Selected" : "○ Select",
+          onClick: () => handleSelectMethod(realIdx, selectNode, parentNode)
         },
         style: { 
-          background: '#95B9F3', 
-          width: '70px',
+          background: realIdx === selectedMethodIndex ? '#4CAF50' : 'rgb(236, 243, 254)',
+          width: '90px',
           height: '32px',
           borderRadius: '16px',
           border: 'none',
-          fontSize: '10px', }, 
+          fontSize: '10px',
+          color: realIdx === selectedMethodIndex ? 'white' : '#333',
+          fontWeight: realIdx === selectedMethodIndex ? 'bold' : 'normal',
+        },
         sourcePosition: 'right', 
-        targetPosition: 'left' };
-
-      if (!nodes.some(n => n.id === yesNodeId)) setNodes(prev => [...prev, yesNode]);
-      setEdges(prev => prev.some
-        (e => e.id === `e-${parentNode.id}-${yesNodeId}`)
-        ? prev : [...prev, { id: `e-${parentNode.id}-${yesNodeId}`, source: parentNode.id, 
-          target: yesNode.id, 
-          markerEnd: { 
-            type: MarkerType.Arrow, 
-            strokeWidth: 2, 
-            color: currentEdgeColor }, 
-          style: { 
-            strokeWidth: 2, 
-            stroke: currentEdgeColor 
-          } }]
+        targetPosition: 'left',
+        hidden: false
+      };
+      
+      if (!nodes.some(n => n.id === selectNodeId)) {
+        setNodes(prev => [...prev, selectNode]);
+      } else {
+        // Update existing node
+        setNodes(prev => prev.map(node => {
+          if (node.id === selectNodeId) {
+            return {
+              ...node,
+              data: {
+                label: idx === selectedMethodIndex ? "● Selected" : "○ Select",
+                onClick: () => handleSelectMethod(idx, selectNode, parentNode)
+              },
+              style: {
+                ...node.style,
+                background: idx === selectedMethodIndex ? '#4CAF50' : 'rgb(236, 243, 254)',
+                color: idx === selectedMethodIndex ? 'white' : '#333',
+                fontWeight: idx === selectedMethodIndex ? 'bold' : 'normal',
+              }
+            };
+          }
+          return node;
+        }));
+      }
+      
+      // Add edge from chatbot-placeholder (or parent) to select button
+      const sourceNode = chatbotPlaceholder || parentNode;
+      setEdges(prev => prev.some(e => e.id === `e-${sourceNode.id}-${selectNodeId}`)
+        ? prev
+        : [...prev, {
+            id: `e-${sourceNode.id}-${selectNodeId}`,
+            source: sourceNode.id,
+            target: selectNodeId,
+            markerEnd: {
+              type: MarkerType.Arrow,
+              strokeWidth: 2,
+              color: currentEdgeColor
+            },
+            style: {
+              strokeWidth: 2,
+              stroke: currentEdgeColor
+            }
+          }]
       );
-
-      // tasks
+      
+      // Render subtasks for this method
       option.forEach((task, i) => {
-        const taskId = task.hash;
-        const taskNode = { 
-          id: taskId, 
-          position: { 
-            x: parentNode.position.x + 400, 
-            y: parentNode.position.y + idx * 100 + i * 50 },
+        const taskId = `${task.hash}-opt${realIdx}`;
+        const taskNode = {
+          id: taskId,
+          position: {
+            x: selectButtonX + 450, // Position subtasks same offset as best match (450 from select button)
+            y: baseY + i * 50
+          },
           data: { 
-            label: task.task_name,
+            label: `${task.task_name} ${task.args || ''}`,
             task_name: task.task_name,
             args: task.args,
             hash: task.hash
-          }, 
-          style: { background: currentNodeColor, border: 'none' },
-          sourcePosition: 'right', targetPosition: 'left' };
-
-        if (!nodes.some(n => n.id === taskId)) setNodes(prev => [...prev, taskNode]);
-        setEdges(prev => prev.some(e => e.id === `e-${yesNodeId}-${taskId}`)
-          ? prev : [...prev, { id: `e-${yesNodeId}-${taskId}`, 
-            source: yesNodeId, 
-            target: taskId, 
-            markerEnd: { type: MarkerType.Arrow, strokeWidth: 2, color: currentEdgeColor }, 
-            style: { strokeWidth: 2, stroke: currentEdgeColor } }]
+          },
+          style: {
+            background: realIdx === selectedMethodIndex ? currentNodeColor : nextNodeColor,
+            border: 'none'
+          },
+          sourcePosition: 'right',
+          targetPosition: 'left'
+        };
+        
+        if (!nodes.some(n => n.id === taskId)) {
+          setNodes(prev => [...prev, taskNode]);
+        }
+        
+        setEdges(prev => prev.some(e => e.id === `e-${selectNodeId}-${taskId}`)
+          ? prev
+          : [...prev, {
+              id: `e-${selectNodeId}-${taskId}`,
+              source: selectNodeId,
+              target: taskId,
+              markerEnd: {
+                type: MarkerType.Arrow,
+                strokeWidth: 2,
+                color: realIdx === selectedMethodIndex ? currentEdgeColor : nextNodeColor
+              },
+              style: {
+                strokeWidth: 2,
+                stroke: realIdx === selectedMethodIndex ? currentEdgeColor : nextNodeColor
+              }
+            }]
         );
       });
     });
-
-    // 3. Re-add “+ Create Method” if missing
-    const addMethod = {
-      id: 'add method',
-      position: { x: parentNode.position.x + 200, 
-        y: parentNode.position.y + (data.subtasks.length-2)*100 +50},
-      data: { label: '+ Create Subtasks', onClick: handleAddMethod },
+    
+    // Add "+ Create Method" button at the bottom of all options
+    // Calculate Y position: below all other methods
+    const totalOtherMethodsHeight = data.subtasks.slice(1).reduce((sum, opt, idx) => {
+      return sum + opt.length * 50 + 50; // Each method's subtasks height + gap
+    }, 0);
+    const lastOptionY = bestMatchBottomY + startingYOffset + totalOtherMethodsHeight;
+    
+    const createMethodNode = {
+      id: 'create-new-method',
+      position: {
+        x: selectButtonX,
+        y: lastOptionY
+      },
+      data: {
+        label: '+ Create Method',
+        onClick: handleCreateNewMethod
+      },
       style: {
-        width: '100px',
-        background: moreNodeColor,
+        width: '120px',
+        background: 'rgb(236, 243, 254)',
         height: '32px',
         borderRadius: '16px',
         border: 'none',
         fontSize: '10px',
       },
+      sourcePosition: 'right',
+      targetPosition: 'left',
     };
-    if (!nodes.some(n => n.id === 'add method')) {
-      setNodes(prev => [...prev, addMethod]);
+    
+    if (!nodes.some(n => n.id === 'create-new-method')) {
+      setNodes(prev => [...prev, createMethodNode]);
     }
-
-  }, [showAllOptions]);
+  }, [showAllOptions, selectedMethodIndex, data.subtasks]);
 
   // This function updates the nodes and edges when user confirms or rejects decomposition
   const updateNodesAndEdges = () => {
@@ -635,6 +769,190 @@ useEffect(() => {
 
       return [...updatedEdges, ...newEdges];
     });
+  };
+  
+  // Handle selecting a method
+  const handleSelectMethod = (index, selectNode, parentNode) => {
+    console.log('Method selected:', index);
+    setSelectedMethodIndex(index);
+    setIsEditMode(true);
+    
+    // Enable editing for the selected method's subtasks
+    const selectedSubtasks = data.subtasks[index];
+    selectedSubtasks.forEach((task, i) => {
+      const taskId = `${task.hash}-opt${index}`;
+      const taskNode = nodesRef.current.find(n => n.id === taskId);
+      if (taskNode) {
+        // Add edit button to each subtask
+        handleEditClick({
+          hash: taskId,
+          task_name: task.task_name,
+          args: task.args
+        });
+      }
+    });
+  };
+  
+  // Handle creating a new method
+  const handleCreateNewMethod = () => {
+    console.log('Create new method clicked');
+    const parentNode = nodes.find(n => n.id.includes(data.head.hash));
+    if (!parentNode) return;
+    
+    setSelectedMethodIndex(-1); // -1 indicates new method
+    setIsEditMode(true);
+    
+    // Create a new editable node
+    const newTaskId = `${data.head.hash}-new-${Date.now()}`;
+    const dropdownOptions1 = data.available_actions || [];
+    const dropdownOptions2 = data.env_objects || [];
+    const defaultTaskName = (dropdownOptions1 && dropdownOptions1[0]) || '';
+    const defaultArg = '';
+    
+    const newNode = {
+      id: newTaskId,
+      position: {
+        x: parentNode.position.x + 400,
+        y: parentNode.position.y + data.subtasks.length * 100
+      },
+      data: {
+        label: (
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <select
+              defaultValue={defaultTaskName}
+              onChange={(e) => handleNodeEditChange(e, newTaskId, 'dropdown1')}
+              style={{
+                width: '100px',
+                border: '1px solid black',
+                background: 'white',
+                textAlign: 'center',
+              }}
+            >
+              {dropdownOptions1.map((option, index) => (
+                <option key={index} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <select
+              defaultValue={defaultArg}
+              onChange={(e) => handleNodeEditChange(e, newTaskId, 'dropdown2')}
+              style={{
+                width: '100px',
+                border: '1px solid black',
+                background: 'white',
+                textAlign: 'center',
+              }}
+            >
+              <option value="">No object</option>
+              {dropdownOptions2.map((option, index) => (
+                <option key={index} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+        ),
+        task_name: defaultTaskName,
+        args: defaultArg === "" ? [] : [defaultArg],
+        dropdown1: defaultTaskName,
+        dropdown2: defaultArg
+      },
+      style: { background: currentNodeColor, border: 'none' },
+      sourcePosition: 'right',
+      targetPosition: 'left',
+    };
+    
+    // Add confirm, trash, and add buttons
+    const confirmButtonNode = {
+      id: `${newTaskId}-confirm`,
+      position: {
+        x: newNode.position.x + 130,
+        y: newNode.position.y + 30,
+      },
+      data: {
+        label: '✓',
+        onClick: () => handleConfirmEdit(newTaskId),
+      },
+      style: {
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+    
+    const trashButtonNode = {
+      id: `${newTaskId}-trash`,
+      position: {
+        x: newNode.position.x + 155,
+        y: newNode.position.y + 30,
+      },
+      data: {
+        label: '🗑',
+        onClick: () => handleTrashClick(newTaskId),
+      },
+      style: {
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+    
+    const addButtonNode = {
+      id: `${newTaskId}-add`,
+      position: {
+        x: newNode.position.x + 180,
+        y: newNode.position.y + 30,
+      },
+      data: {
+        label: '+',
+        onClick: () => handleAddNode({ hash: newTaskId }),
+      },
+      style: {
+        background: 'none',
+        width: '20px',
+        height: '20px',
+        borderRadius: 'none',
+        border: '1px solid black',
+        fontSize: '10px',
+        textAlign: 'center',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+    };
+    
+    setNodes(prev => [...prev, newNode, confirmButtonNode, trashButtonNode, addButtonNode]);
+    
+    // Add edge from create-new-method button to new node
+    setEdges(prev => [...prev, {
+      id: `e-create-new-method-${newTaskId}`,
+      source: 'create-new-method',
+      target: newTaskId,
+      markerEnd: {
+        type: MarkerType.Arrow,
+        strokeWidth: 2,
+        color: currentEdgeColor
+      },
+      style: {
+        strokeWidth: 2,
+        stroke: currentEdgeColor
+      },
+    }]);
   };
   
 
@@ -702,39 +1020,19 @@ useEffect(() => {
         });
       });
   
-      // Hide the edge connected to the confirmed yesNode
-      const updatedEdges = prevEdges.map(edge => {
-        if (edge.target === yesNode.id) {
-          return { ...edge, hidden: true };
-        }
-        return edge;
-      });
-  
-      // Remove all edges connected to rejected yesNodes or their children
-      return updatedEdges.filter(edge =>
-        !nodesToRemove.has(edge.source) && !nodesToRemove.has(edge.target)
+      // Remove all edges connected to rejected yesNodes, their children, and chatbot
+      return prevEdges.filter(edge =>
+        !nodesToRemove.has(edge.source) && 
+        !nodesToRemove.has(edge.target) &&
+        edge.source !== 'chatbot-node' && // Remove edges from chatbot
+        edge.target !== 'chatbot-node'   // Remove edges to chatbot
       );
     });
   
     setNodes(prevNodes => {
-  
-    return prevNodes.map(node => {
-      
-      if (node.id === yesNode.id) {
-        return {
-          ...node,
-          hidden: true,
-          position: {
-            ...node.position,
-            y: node.position.y - offsetY
-          },
-          data: {
-            ...node.data,
-            label: '···',
-            onClick: () => handleUnhide(yesNode),
-          }
-        };
-      } else if (nodesToRemove.has(node.id)) {
+      return prevNodes
+        .map(node => {
+          if (nodesToRemove.has(node.id)) {
         return null;
       } else if (directTaskNodeIds.includes(node.id)) {
         return {
@@ -748,7 +1046,10 @@ useEffect(() => {
       return node;
     })
     .filter(Boolean)
-    .filter(node => !node.id.endsWith('-edit')); // Remove all edit buttons
+        .filter(node => 
+          !node.id.endsWith('-edit') && // Remove all edit buttons
+          node.id !== 'chatbot-node' // Remove chatbot node
+        );
   });
   
     updateNodesAndEdges();
