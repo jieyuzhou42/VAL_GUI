@@ -7,10 +7,22 @@ const currentNodeColor = 'rgb(205, 221, 249)';
 const currentEdgeColor = 'rgb(132, 171, 249)';
 const nextNodeColor = 'rgb(222, 222, 222)';
 
+// Use same constants as confirm_best_match_decomposition
+const SUBTASK_CONSTANTS = {
+  YESNODE_OFFSET_X: 500,        // Must match confirm_best_match_decomposition
+  YESNODE_OFFSET_Y: 0,
+  YESNODE_TO_SUBTASK_X: 150,
+  SUBTASK_VERTICAL_SPACING: 150, // Must match confirm_best_match_decomposition
+};
+
 
 function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, setEdges}) {
     useEffect(() => {
-      console.log("DisplayAddedMethod component mounted!");
+      console.log("=== DisplayAddedMethod component mounted ===");
+      console.log("Current nodes:", nodes.map(n => n.id));
+      console.log("Looking for chatbot-node:", nodes.some(n => n.id === 'chatbot-node'));
+      console.log("Looking for chatbot-placeholder:", nodes.some(n => n.id === 'chatbot-placeholder'));
+      
       let parentNode = nodes.find(n => n.id.includes(data.head.hash));
   
       if (!parentNode) {
@@ -31,98 +43,10 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
         setNodes(prev => [...prev, parentNode]);
       } else {
         console.log("Parent node found:", parentNode);
-        const parentNodeId = parentNode.id;
-  
-        // hide the nodes that are not connected to the parent node
-        setNodes(prevNodes => prevNodes.map(node => {
-          if (node.position.x >= (parentNode.position.x + 200)) {
-            // Don't show unhide (approve) buttons - user already approved via chatbot
-            // if (node.id.includes('unhide')) {
-            //   return { ...node, hidden: false };
-            // }
-            return { ...node, hidden: true };
-          }
-          if (edges.some(edge => edge.source === parentNodeId && edge.target === node.id)) {
-            return node;
-          }
-          return node;
-        }));
-  
-        // hide the edges that are not connected to the parent node
-        setEdges(prevEdges => prevEdges.filter(edge => edge.source !== parentNode.id));
+        console.log("=== Skipping hide/show and color logic in DisplayAddedMethod ===");
+        // NO LONGER HIDING NODES OR CHANGING COLORS
+        // We want to show all approved decomposition trees
       }
-  
-      // set the nodes color
-      setNodes(prevNodes => prevNodes.map(node => {
-        if (node.id.includes('unhide')) {
-          // for the yes node, make the background color none
-          return {
-            ...node,
-            style: {
-              ...node.style,
-              background: 'none',
-              border: 'none',
-            }
-          };
-        } else if (node.id === parentNode.id ||
-            edges.some(edge => edge.source === parentNode.id && edge.target === node.id) ||
-            edges.some(edge => edge.target === parentNode.id && edge.source === node.id) 
-        ) {
-          // for the nodes with id data.head.hash, make the background color blue
-          return {
-            ...node,
-            style: {
-              ...node.style,
-              background: currentNodeColor,
-              border: 'none',
-            }
-          };
-        } else if (!node.id.includes('unhide')) {
-          // for the next nodes, make the background color gray
-          return {
-            ...node,
-            style: {
-              ...node.style,
-              background: nextNodeColor,
-            }
-          }
-        } else {
-          return node;
-        }
-      }));
-  
-      // set the edges color
-      setEdges(prevEdges => prevEdges.map(edge => {
-        if (edge.source === parentNode.id || edge.target === parentNode.id) {
-          return {
-            ...edge,
-            style: {
-              ...edge.style,
-              stroke: currentEdgeColor,
-              strokeWidth: 2,
-            },
-            markerEnd: {
-              type: MarkerType.Arrow,
-              strokeWidth: 2,
-              color: currentEdgeColor,
-            },
-          };
-        } else {
-          return {
-            ...edge,
-            style: {
-              ...edge.style,
-              stroke: nextNodeColor,
-              strokeWidth: 2,
-            },
-            markerEnd: {
-              type: MarkerType.Arrow,
-              strokeWidth: 2,
-              color: nextNodeColor,
-            },
-          };
-        }
-      }));
   
       // if there is no subtask just update the highlighted path and return
       if (data.subtasks.length === 0) {
@@ -133,24 +57,35 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       // User already approved via chatbot, so we don't need approve button
       // Just proceed to showing subtasks directly connected to parent
   
-      console.log(" Creating child node.", nodes);
+      console.log(" Checking if subtasks need to be created.", nodes);
       const newNodes = [];
       const newEdges = [];
       
       // Use same yesNode position logic as confirm_best_match_decomposition
-      // yesNode.x = parent.x + 300 (aligns with placeholder position)
-      const yesNodeX = parentNode.position.x + 300;
+      const yesNodeX = parentNode.position.x + SUBTASK_CONSTANTS.YESNODE_OFFSET_X;
       
-      // Find chatbot-placeholder once, outside the loop
-      const chatbotPlaceholder = nodes.find(n => n.id === 'chatbot-placeholder');
+      // Find the specific placeholder for this parent node (unique ID: placeholder-{parentHash})
+      const placeholderId = `placeholder-${parentNode.id}`;
+      const chatbotPlaceholder = nodes.find(n => n.id === placeholderId);
+      console.log('Looking for placeholder:', placeholderId);
+      console.log('Found placeholder:', chatbotPlaceholder);
+      
+      // Check which subtasks already exist (created by handleConfirm)
+      const existingNodeIds = new Set(nodes.map(n => n.id));
   
-      // Create child nodes for each subtask
+      // Create child nodes for each subtask (only if they don't already exist)
       data.subtasks[0].forEach((task, subIndex) => {
+        if (existingNodeIds.has(task.hash)) {
+          console.log('Subtask node already exists:', task.hash);
+          return; // Skip creating this node
+        }
+        
+        console.log('Creating new subtask node:', task.hash);
         const taskNode = {
           id: task.hash,
           position: { 
-            x: yesNodeX + 450, // Same as confirm_best_match: yesNode.x + 450
-            y: parentNode.position.y + subIndex * 50 // Consistent vertical spacing
+            x: yesNodeX + SUBTASK_CONSTANTS.YESNODE_TO_SUBTASK_X,
+            y: parentNode.position.y + subIndex * SUBTASK_CONSTANTS.SUBTASK_VERTICAL_SPACING
           },
           data: { 
             label: `${task.task_name} ${task.args}`,
@@ -158,8 +93,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
             args: task.args,
             hash: task.hash
           },
-          // debugging
-          // data: {label: `${task.hash}-${task.Task}`},
           _style: {
             background: currentNodeColor,
             border: 'none',
@@ -178,7 +111,7 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
   
         console.log('taskNode background:', taskNode?.style?.background);
   
-        // Add edge from chatbot-placeholder (if exists) or parent to task node
+        // Add edge from placeholder (if exists) or parent to task node
         const sourceNode = chatbotPlaceholder || parentNode;
         newEdges.push({
           id: `e-${sourceNode.id}-${taskNode.id}`,
@@ -195,34 +128,25 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
           },
         });
       });
+      
+      console.log('New nodes to create:', newNodes.length);
+      console.log('New edges to create:', newEdges.length);
   
-    setNodes(prev => [...prev, ...newNodes]);
+    // Only add nodes that don't already exist
+    if (newNodes.length > 0) {
+      setNodes(prev => [...prev, ...newNodes]);
+    }
+    
+    // Filter out duplicate edges before adding
     setEdges(prev => {
-      const updatedEdges = [...prev, ...newEdges];
-      
-      // If there's a chatbot-placeholder, add edge from parent to placeholder
-      if (chatbotPlaceholder) {
-        const placeholderEdgeId = `e-${parentNode.id}-${chatbotPlaceholder.id}`;
-        if (!updatedEdges.some(e => e.id === placeholderEdgeId)) {
-          updatedEdges.push({
-            id: placeholderEdgeId,
-            source: parentNode.id,
-            target: chatbotPlaceholder.id,
-            markerEnd: {
-              type: MarkerType.Arrow,
-              strokeWidth: 2,
-              color: currentEdgeColor,
-            },
-            style: {
-              strokeWidth: 2,
-              stroke: currentEdgeColor,
-            },
-          });
-        }
-      }
-      
-      return updatedEdges;
+      const existingEdgeIds = new Set(prev.map(e => e.id));
+      const uniqueNewEdges = newEdges.filter(e => !existingEdgeIds.has(e.id));
+      console.log('Adding edges:', uniqueNewEdges.length, 'out of', newEdges.length, 'new edges');
+      return [...prev, ...uniqueNewEdges];
     });
+    
+    // NOTE: Parent → placeholder edge is already created by handleConfirm replacement logic
+    // No need to create it again here
     
     // User already approved via chatbot, automatically send response to backend
     // to continue the flow

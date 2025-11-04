@@ -122,6 +122,10 @@ function Chatbot({ socket, message }) {
   }
 
   function buildDialog(data) {
+    console.log('=== buildDialog CALLED ===');
+    console.log('Message type:', data['type']);
+    console.log('Message text:', data['text']);
+    
     let displayText = data['text'];
     
     // Enhanced formatting for different message types
@@ -133,7 +137,9 @@ function Chatbot({ socket, message }) {
       displayText = formatEditOptionsText(data['text']);
     }
     
+    console.log('About to append message with text:', displayText);
     appendMessage("VAL", valPic, "left", displayText);
+    console.log('Message appended successfully');
   }
 
   function formatAnalysisTextSimple(text) {
@@ -214,21 +220,26 @@ function Chatbot({ socket, message }) {
   }
 
   function showThinkingAnalysisAndDecomposition(message) {
+    console.log('=== showThinkingAnalysisAndDecomposition CALLED ===');
     console.log('showThinkingAnalysisAndDecomposition called with message:', message);
-    const data = message.text;
-    const userTask = data.user_task;
-    const taskName = data.task_name;
-    const taskArgs = data.task_args;
-    const analysisText = data.analysis_text;
     
-    console.log('Thinking analysis and decomposition data:', { userTask, taskName, taskArgs, analysisText });
-    
-    // Format the analysis text (use the one from backend if available)
-    const formattedText = formatAnalysisTextSimple(analysisText || `Thinking...
+    try {
+      const data = message.text;
+      const userTask = data.user_task;
+      const taskName = data.task_name;
+      const taskArgs = data.task_args;
+      const analysisText = data.analysis_text;
+      
+      console.log('Thinking analysis and decomposition data:', { userTask, taskName, taskArgs, analysisText });
+      
+      // Format the analysis text (use the one from backend if available)
+      console.log('About to format text...');
+      const formattedText = formatAnalysisTextSimple(analysisText || `Thinking...
 
 Based on your input "${userTask}", I understood this as the action: ${taskName}(${taskArgs ? taskArgs.join(', ') : ''}).
 
 Is it correct?`);
+      console.log('Text formatted successfully');
     
     // Create approve/reject buttons for grounding confirmation
     const buttonsDiv = document.createElement('div');
@@ -240,7 +251,11 @@ Is it correct?`);
     approveButton.innerHTML = '✓ Approve';
     approveButton.style.marginRight = '10px';
     approveButton.onclick = () => {
-      console.log('Chatbot approve button clicked, triggering tree action...');
+      console.log('===========================================');
+      console.log('=== CHATBOT APPROVE BUTTON CLICKED!!! ===');
+      console.log('===========================================');
+      console.log('Triggering chatbot_decomposition_action event...');
+      console.trace('Button click stack trace');
       
       // Trigger the tree component's handleConfirm via custom event
       // The tree component will send the socket message
@@ -248,6 +263,7 @@ Is it correct?`);
         detail: { action: 'approve', index: 0 }
       });
       window.dispatchEvent(event);
+      console.log('Event dispatched:', event);
       
       // Disable and fade out buttons after clicking
       approveButton.disabled = true;
@@ -256,6 +272,7 @@ Is it correct?`);
       rejectButton.style.opacity = '0.3';
       approveButton.style.cursor = 'not-allowed';
       rejectButton.style.cursor = 'not-allowed';
+      console.log('Buttons disabled and faded');
     };
 
     const rejectButton = document.createElement('button');
@@ -281,12 +298,23 @@ Is it correct?`);
     buttonsDiv.appendChild(approveButton);
     buttonsDiv.appendChild(rejectButton);
     
-    // Display the thinking analysis with buttons
-    appendMessage("VAL", valPic, "left", formattedText, buttonsDiv);
+    console.log('=== BUTTONS CREATED ===');
+    console.log('Approve button:', approveButton);
+    console.log('Reject button:', rejectButton);
+    console.log('Buttons div:', buttonsDiv);
     
-    // Also trigger decomposition tree display (this should be handled by the backend)
-    // For now, we'll emit a message to show the decomposition tree
-    console.log('Triggering decomposition tree display...');
+      // Display the thinking analysis with buttons
+      console.log('About to append message...');
+      appendMessage("VAL", valPic, "left", formattedText, buttonsDiv);
+      console.log('=== MESSAGE APPENDED ===');
+      
+      // Also trigger decomposition tree display (this should be handled by the backend)
+      // For now, we'll emit a message to show the decomposition tree
+      console.log('Triggering decomposition tree display...');
+    } catch (error) {
+      console.error('Error in showThinkingAnalysisAndDecomposition:', error);
+      console.error('Error stack:', error.stack);
+    }
   }
 
   function displayDecompositionAnalysis(message) {
