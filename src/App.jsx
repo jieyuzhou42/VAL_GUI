@@ -16,9 +16,9 @@ const POSITION_CONSTANTS = {
   PARENT_TO_CHATBOT_OFFSET_X: 100,     // Parent → Chatbot X distance
   PARENT_TO_CHATBOT_OFFSET_Y: 0,       // Parent → Chatbot Y offset (0 = same height)
   CHATBOT_NODE_OFFSET_X: 70,           // ChatbotPosition → Chatbot Node X offset
-  CHATBOT_NODE_OFFSET_Y: 0,             // ChatbotPosition → Chatbot Node Y offset (0 = same height)
-  PLACEHOLDER_OFFSET_X: 100,            // ChatbotPosition → Placeholder X offset
-  PLACEHOLDER_OFFSET_Y: 0,              // ChatbotPosition → Placeholder Y offset (0 = same height)
+  CHATBOT_NODE_OFFSET_Y: 0,            // ChatbotPosition → Chatbot Node Y offset (0 = same height)
+  PLACEHOLDER_OFFSET_X: 100,           // ChatbotPosition → Placeholder X offset
+  PLACEHOLDER_OFFSET_Y: 0,             // ChatbotPosition → Placeholder Y offset (0 = same height)
 };
 
 function App () {

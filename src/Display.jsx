@@ -6,9 +6,18 @@ import Chatbot from './chatbot';
 const nodeTypes = {
   chatbot: ({ data }) => (
     <div style={{ position: 'relative' }}>
-      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+      {/* Align handle vertically with regular task nodes (avoid awkward bend to mid-panel) */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ background: '#555', top: 0, transform: 'none' }}
+      />
       <Chatbot socket={data.socket} message={data.message} />
-      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ background: '#555', top: 0, transform: 'none' }}
+      />
     </div>
   )
 };
@@ -21,6 +30,7 @@ function Display({ nodes, edges }) {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            defaultEdgeOptions={{ type: 'smoothstep' }}
             // This inline function deals with specific node that have onclick in their data
             // confirm, more options, add method and edit
             onNodeClick={(event, node) => {

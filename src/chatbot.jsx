@@ -79,6 +79,11 @@ function Chatbot({ socket, message }) {
         showThinkingAnalysisAndDecomposition(message);
         console.log('showThinkingAnalysisAndDecomposition called');
       }
+      else if (message['type'] === 'confirm_best_match_decomposition') {
+        console.log('About to call displayDecompositionConfirmationFromTree');
+        displayDecompositionConfirmationFromTree(message);
+        console.log('displayDecompositionConfirmationFromTree called');
+      }
       else if (message['type'] === 'display_decomposition_analysis') {
         console.log('About to call displayDecompositionAnalysis');
         displayDecompositionAnalysis(message);
@@ -568,6 +573,66 @@ Is it correct?`);
     buttonsDiv.appendChild(rejectButton);
     
     // Display the analysis with buttons
+    appendMessage("VAL", valPic, "left", formattedText, buttonsDiv);
+  }
+
+  function displayDecompositionConfirmationFromTree(message) {
+    console.log('displayDecompositionConfirmationFromTree called with message:', message);
+    const container = document.getElementById('prompt-message');
+    if (container && container.children.length > 0) {
+      console.log('Skipping fallback confirmation message because the chatbot already has content');
+      return;
+    }
+
+    const treeData = message.text;
+    const taskName = treeData?.head?.name || 'task';
+    const taskArg = treeData?.head?.V || '';
+    const subtasks = treeData?.subtasks?.[0] || [];
+    const subtaskNames = subtasks.map(task => `${task.task_name}(${(task.args || []).join(', ')})`);
+    const analysisText = `Thinking...
+
+Based on my knowledge and the condition, I will decompose ${taskName} to ${subtaskNames.join(', ')}.
+
+Is it correct?`;
+
+    const formattedText = formatAnalysisTextSimple(analysisText);
+
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.className = 'chatbot-container buttons';
+    buttonsDiv.style.marginTop = '10px';
+
+    const approveButton = document.createElement('button');
+    approveButton.className = 'yes';
+    approveButton.innerHTML = '✓ Approve';
+    approveButton.style.marginRight = '10px';
+    approveButton.onclick = () => {
+      const event = new CustomEvent('chatbot_decomposition_action', {
+        detail: { action: 'approve', index: 0 }
+      });
+      window.dispatchEvent(event);
+      approveButton.disabled = true;
+      rejectButton.disabled = true;
+      approveButton.style.opacity = '0.3';
+      rejectButton.style.opacity = '0.3';
+    };
+
+    const rejectButton = document.createElement('button');
+    rejectButton.className = 'no';
+    rejectButton.innerHTML = '× Reject';
+    rejectButton.onclick = () => {
+      const event = new CustomEvent('chatbot_show_all_methods', {
+        detail: { action: 'show_all' }
+      });
+      window.dispatchEvent(event);
+      approveButton.disabled = true;
+      rejectButton.disabled = true;
+      approveButton.style.opacity = '0.3';
+      rejectButton.style.opacity = '0.3';
+    };
+
+    buttonsDiv.appendChild(approveButton);
+    buttonsDiv.appendChild(rejectButton);
+
     appendMessage("VAL", valPic, "left", formattedText, buttonsDiv);
   }
 

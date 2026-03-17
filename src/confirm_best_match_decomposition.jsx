@@ -302,7 +302,7 @@ useEffect(() => {
         id: task.hash,
         position: { 
           x: yesNode.position.x + SUBTASK_CONSTANTS.YESNODE_TO_SUBTASK_X,
-          y: parentNode.position.y + subIndex * SUBTASK_CONSTANTS.SUBTASK_VERTICAL_SPACING
+          y: parentNode.position.y + subIndex *(150/(parentNode.position.x/200+1))
         },
         data: { 
           label: `${task.task_name} ${task.args}`,
