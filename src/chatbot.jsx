@@ -4,6 +4,15 @@ import userPic from './assets/user_pic.jpg';
 import valPic from './assets/val_pic.jpg';
 
 function Chatbot({ socket, message }) {
+  const emitMessage = (payload) => {
+    try {
+      console.log('[chatbot] emitting ->', payload);
+      socket?.emit?.('message', payload);
+    } catch (e) {
+      console.error('[chatbot] emit failed:', e, 'payload:', payload);
+    }
+  };
+
   useEffect(() => {
     console.log('Chatbot component mounted!');
 
@@ -28,7 +37,7 @@ function Chatbot({ socket, message }) {
 
         if (socket) {
           try {
-            socket.emit('message', {type:"confirm_response", response: userInput });
+            emitMessage({ type: "confirm_response", response: userInput });
           } catch (error) {
             console.error('Error sending message:', error);
           }
@@ -261,6 +270,11 @@ Is it correct?`);
       console.log('===========================================');
       console.log('Triggering chatbot_decomposition_action event...');
       console.trace('Button click stack trace');
+
+      emitMessage({
+        type: 'response_decomposition_with_edit',
+        response: { user_choice: 'approve', index: 0 },
+      });
       
       // Trigger the tree component's handleConfirm via custom event
       // The tree component will send the socket message
@@ -583,7 +597,6 @@ Is it correct?`);
       console.log('Skipping fallback confirmation message because the chatbot already has content');
       return;
     }
-
     const treeData = message.text;
     const taskName = treeData?.head?.name || 'task';
     const taskArg = treeData?.head?.V || '';
@@ -606,6 +619,10 @@ Is it correct?`;
     approveButton.innerHTML = '✓ Approve';
     approveButton.style.marginRight = '10px';
     approveButton.onclick = () => {
+      emitMessage({
+        type: 'response_decomposition_with_edit',
+        response: { user_choice: 'approve', index: 0 },
+      });
       const event = new CustomEvent('chatbot_decomposition_action', {
         detail: { action: 'approve', index: 0 }
       });

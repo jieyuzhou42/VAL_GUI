@@ -1,11 +1,11 @@
-import React from 'react';
-import { ReactFlow, Handle, Position } from '@xyflow/react';
+import React, { useEffect } from 'react';
+import { ReactFlow, Handle, Position, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import Chatbot from './chatbot';
 
 const nodeTypes = {
   chatbot: ({ data }) => (
-    <div style={{ position: 'relative' }}>
+    <div className="nodrag nopan" style={{ position: 'relative', pointerEvents: 'auto' }}>
       {/* Align handle vertically with regular task nodes (avoid awkward bend to mid-panel) */}
       <Handle
         type="target"
@@ -22,6 +22,22 @@ const nodeTypes = {
   )
 };
 
+function AutoFitView({ nodes }) {
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    if (nodes.length === 0) return;
+
+    const frame = requestAnimationFrame(() => {
+      fitView({ padding: 0.2, duration: 250 });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [nodes, fitView]);
+
+  return null;
+}
+
 function Display({ nodes, edges }) {
     console.log("Display rendering with nodes:", nodes);
     return (
@@ -31,6 +47,7 @@ function Display({ nodes, edges }) {
             edges={edges}
             nodeTypes={nodeTypes}
             defaultEdgeOptions={{ type: 'smoothstep' }}
+            nodesDraggable={false}
             // This inline function deals with specific node that have onclick in their data
             // confirm, more options, add method and edit
             onNodeClick={(event, node) => {
@@ -39,7 +56,9 @@ function Display({ nodes, edges }) {
                 }
               }}
             fitView
-        />
+        >
+          <AutoFitView nodes={nodes} />
+        </ReactFlow>
         </div>
     );
 }

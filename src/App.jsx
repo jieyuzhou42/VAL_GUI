@@ -28,6 +28,8 @@ function App () {
   const [edges, setEdges] = useState([]);
   const [chatbotPosition, setChatbotPosition] = useState({ x: 50, y: 50 });
   const nodesRef = useRef([]);
+  const positionedHeadHashRef = useRef(null);
+  const shiftedHeadHashesRef = useRef(new Set());
   // these are constants that pass through each components
   // all components just make changes to these constants
   // and display renders them
@@ -35,19 +37,31 @@ function App () {
   useEffect(() => {
     // Keep nodesRef in sync with nodes state
     nodesRef.current = nodes;
-    
-   
+
     if (message?.type === 'confirm_best_match_decomposition' && message?.text?.head?.hash) {
       const headHash = message.text.head.hash;
-      const targetNode = nodesRef.current.find(node => node.id.includes(headHash));
+      const targetNode =
+        nodesRef.current.find(node => node.id === headHash) ||
+        nodesRef.current.find(node =>
+          node.id.includes(headHash) &&
+          !node.id.startsWith('placeholder-') &&
+          !node.id.endsWith('-edit') &&
+          node.id !== 'chatbot-node'
+        );
+
       if (targetNode) {
-        setChatbotPosition({
+        const nextPosition = {
           x: targetNode.position.x + POSITION_CONSTANTS.PARENT_TO_CHATBOT_OFFSET_X,
           y: targetNode.position.y + POSITION_CONSTANTS.PARENT_TO_CHATBOT_OFFSET_Y
-        });
+        };
+
+        setChatbotPosition(prev =>
+          prev.x === nextPosition.x && prev.y === nextPosition.y ? prev : nextPosition
+        );
+        positionedHeadHashRef.current = headHash;
       }
     }
-  }, [message]);
+  }, [message, nodes]);
 
   useEffect(() => {
     socket.on('message', (data) => {
@@ -63,27 +77,40 @@ function App () {
 
   useEffect(() => {
     if (showChatbot) {
-      console.log("Chatbot is visible. Moving nodes...");
-      setNodes(prevNodes =>
-        prevNodes.map(node => {
-          // Move nodes that are to the right of chatbot and not the chatbot itself
-          if (node.position.x > chatbotPosition.x + 200 && node.id !== 'chatbot-node') {
-            if (!movedNodesRef.current.has(node.id)) {
-              console.log(`Saving original position of node ${node.id}: ${node.position.x}`);
-              movedNodesRef.current.set(node.id, node.position.x); // Save original position
+      const headHash =
+        message?.type === 'confirm_best_match_decomposition' ? message?.text?.head?.hash : null;
+      const shouldShiftRight =
+        !!headHash &&
+        positionedHeadHashRef.current === headHash &&
+        !shiftedHeadHashesRef.current.has(headHash);
+
+      if (shouldShiftRight) {
+        console.log("Chatbot anchored for new head. Moving nodes once...");
+        shiftedHeadHashesRef.current.add(headHash);
+
+        setNodes(prevNodes =>
+          prevNodes.map(node => {
+            // Move nodes that are to the right of chatbot and not the chatbot itself
+            if (node.position.x > chatbotPosition.x + 200 && node.id !== 'chatbot-node') {
+              if (!movedNodesRef.current.has(node.id)) {
+                console.log(`Saving original position of node ${node.id}: ${node.position.x}`);
+                movedNodesRef.current.set(node.id, node.position.x); // Save original position
+              }
+              return {
+                ...node,
+                position: {
+                  ...node.position,
+                  x: node.position.x + 340, // Shift node by chatbot width (340px)
+                },
+              };
             }
-            return {
-              ...node,
-              position: {
-                ...node.position,
-                x: node.position.x + 340, // Shift node by chatbot width (340px)
-              },
-            };
-          }
-          return node;
-        })
-      );
-      console.log("Moved nodes after moving:", Array.from(movedNodesRef.current.entries()));
+            return node;
+          })
+        );
+        console.log("Moved nodes after moving:", Array.from(movedNodesRef.current.entries()));
+      } else {
+        console.log("Skip right shift: no new anchored head to shift.");
+      }
     } else {
       console.log("Chatbot is hidden. Restoring nodes...");
       console.log("Nodes before restoring:", nodes.map(node => ({ id: node.id, x: node.position.x })));
@@ -123,7 +150,7 @@ function App () {
         }, 0); // Check logs after state update
       }
     }
-  }, [showChatbot, chatbotPosition]);
+  }, [showChatbot, chatbotPosition, message]);
   
   // Handle all message types in one effect
   useEffect(() => {
@@ -142,7 +169,13 @@ function App () {
       'display_thinking_analysis',
       'show_thinking_analysis_and_decomposition',
       'ask_subtasks',
-      'segment_confirmation'
+      'segment_confirmation',
+      'confirm_task_decomposition',
+      'display_decomposition_analysis',
+      'display_method_creation',
+      'display_edit_options',
+      'ask_rephrase',
+      'display_known_tasks'
     ];
     
     if (showChatbotTypes.includes(messageType)) {
@@ -154,8 +187,12 @@ function App () {
       setShowChatbot(true);
     } else if (messageType === 'request_user_task') {
       console.log('Clearing all nodes and edges');
+      setShowChatbot(false);
       setNodes([]);
       setEdges([]);
+      movedNodesRef.current.clear();
+      shiftedHeadHashesRef.current.clear();
+      positionedHeadHashRef.current = null;
     }
   }, [message]);
   
