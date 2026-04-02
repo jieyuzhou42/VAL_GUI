@@ -25,6 +25,7 @@ const isControlNodeId = (nodeId = '') =>
   nodeId.endsWith('-confirm') ||
   nodeId.includes('-unhide-');
 const isTaskContentNode = (node) => !!node && !isControlNodeId(node.id) && typeof node.data?.task_name === 'string';
+const getParentNodeIdFromYesNodeId = (yesNodeId = '') => yesNodeId.split('-unhide-')[0];
 const createTreeEdge = (sourceId, targetId, color = currentEdgeColor) => ({
   id: `e-${sourceId}-${targetId}`,
   source: sourceId,
@@ -203,6 +204,7 @@ useEffect(() => {
     if (!parentNode) {
       return;
     }
+    const childColumnX = getNextColumnX(parentNode.position.x);
     
     // Create a new editable node at the position where subtasks would be
     const newTaskId = `${data.head.hash}-new-${Date.now()}`;
@@ -214,7 +216,7 @@ useEffect(() => {
     const newNode = {
       id: newTaskId,
       position: {
-        x: getNextColumnX(parentNode.position.x),
+        x: childColumnX,
         y: parentNode.position.y
       },
       data: {
@@ -412,6 +414,7 @@ useEffect(() => {
 
     const newNodes = [];
     const newEdges = [];
+    const childColumnX = getNextColumnX(parentNode.position.x);
     const siblingShift = getSiblingShiftGroups(
       parentNode,
       edges,
@@ -422,10 +425,11 @@ useEffect(() => {
     
     // Create child nodes for each subtask
     data.subtasks[0].forEach((task, subIndex) => {
+      const taskNodeId = task.hash;
       const taskNode = {
-        id: task.hash,
+        id: taskNodeId,
         position: { 
-          x: getNextColumnX(parentNode.position.x),
+          x: childColumnX,
           y: getChildY(parentNode.position.y, subIndex, data.subtasks[0].length)
         },
         data: { 
@@ -454,7 +458,7 @@ useEffect(() => {
       // if (subIndex === 0) {
       // Add edit button next to the task node
       const editButtonNode = {
-        id: `${task.hash}-edit`,
+        id: `${taskNodeId}-edit`,
         position: {
           x: taskNode.position.x + TASK_ACTION_OFFSET_X,
           y: taskNode.position.y,
@@ -575,7 +579,8 @@ useEffect(() => {
     if (!parentNode) return;
     
     
-    const selectButtonX = getNextColumnX(parentNode.position.x) - LAYOUT_CONSTANTS.OPTION_SELECT_OFFSET_X;
+    const childColumnX = getNextColumnX(parentNode.position.x);
+    const selectButtonX = childColumnX - LAYOUT_CONSTANTS.OPTION_SELECT_OFFSET_X;
     
     // Calculate the bottom Y position of best match subtasks
     const bestMatchSubtasks = data.subtasks[0] || [];
@@ -659,11 +664,11 @@ useEffect(() => {
       
       // Render subtasks for this method
       option.forEach((task, i) => {
-        const taskId = `${task.hash}-opt${realIdx}`;
+        const taskId = task.hash;
         const taskNode = {
           id: taskId,
           position: {
-            x: getNextColumnX(parentNode.position.x),
+            x: childColumnX,
             y: baseY + i * optionSpacing
           },
           data: { 
@@ -745,7 +750,7 @@ useEffect(() => {
       const newEdges = [];
       const updatedEdges = prevEdges.map(edge => {
         if (edge.source.includes('unhide')) {
-          const parentNodeId = edge.id.split('-')[1];
+          const parentNodeId = getParentNodeIdFromYesNodeId(edge.source);
           const newEdgeId = `e-${parentNodeId}-${edge.target}`;
   
           // Add new edge to the parent node
@@ -776,7 +781,7 @@ useEffect(() => {
     // Enable editing for the selected method's subtasks
     const selectedSubtasks = data.subtasks[index];
     selectedSubtasks.forEach((task, i) => {
-      const taskId = `${task.hash}-opt${index}`;
+      const taskId = task.hash;
       const taskNode = nodesRef.current.find(n => n.id === taskId);
       if (taskNode) {
         // Add edit button to each subtask
@@ -793,6 +798,7 @@ useEffect(() => {
   const handleCreateNewMethod = () => {
     const parentNode = findTaskNodeByHash(nodes, data.head.hash);
     if (!parentNode) return;
+    const childColumnX = getNextColumnX(parentNode.position.x);
     
     setSelectedMethodIndex(-1); // -1 indicates new method
     setIsEditMode(true);
@@ -807,7 +813,7 @@ useEffect(() => {
     const newNode = {
       id: newTaskId,
       position: {
-        x: getNextColumnX(parentNode.position.x),
+        x: childColumnX,
         y: parentNode.position.y + data.subtasks.length * LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING
       },
       data: {
@@ -953,11 +959,14 @@ useEffect(() => {
 
   // every confirsmation step has confirm, more options, add method and edit as options
   const handleConfirm = (yesNode, index, parentNode) => {
+    const currentEdges = edgesRef.current;
+    const currentDirectTaskNodes = currentEdges
+      .filter(edge => edge.source === parentNode?.id)
+      .map(edge => nodesRef.current.find(node => node.id === edge.target))
+      .filter(node => isTaskContentNode(node));
+
     // Check if any subtasks have been edited
-    const hasEditedSubtasks = data.subtasks[0].some(task => {
-      const taskNode = nodesRef.current.find(node => node.id === task.hash);
-      return taskNode && taskNode.data.isEdited === true;
-    });
+    const hasEditedSubtasks = currentDirectTaskNodes.some(node => node.data?.isEdited === true);
 
     // Also check if there are newly added subtasks in the UI
     const hasNewSubtasks = nodesRef.current.some(
@@ -967,17 +976,14 @@ useEffect(() => {
     if (hasEditedSubtasks || hasNewSubtasks) {
       // If there are edits, call handleConfirmEdit for the first edited task
       // handleConfirmEdit will handle all edits
-      const firstEditedTask = data.subtasks[0].find(task => {
-        const taskNode = nodesRef.current.find(node => node.id === task.hash);
-        return taskNode && taskNode.data.isEdited === true;
-      });
+      const firstEditedTask = currentDirectTaskNodes.find(node => node.data?.isEdited === true);
       // If there is no edited original task, pick the first newly added one
       const firstNewTaskId = !firstEditedTask
         ? (nodesRef.current.find(n => n.id.startsWith(`${data.head.hash}-new-`))?.id)
         : undefined;
       
       if (firstEditedTask || firstNewTaskId) {
-        handleConfirmEdit(firstEditedTask ? firstEditedTask.hash : firstNewTaskId);
+        handleConfirmEdit(firstEditedTask ? firstEditedTask.id : firstNewTaskId);
         return; // Exit early, handleConfirmEdit will handle the rest
       }
     }
@@ -986,7 +992,6 @@ useEffect(() => {
     
     // CRITICAL: Extract directTaskNodeIds BEFORE modifying edges
     // The edges are now chatbot → subtasks (not yesNode → subtasks)
-    const currentEdges = edgesRef.current;
     const directTaskNodeIds = currentEdges
       .filter(edge => edge.source === parentNode?.id)
       .map(edge => edge.target)
@@ -1077,7 +1082,7 @@ useEffect(() => {
 
     let edgesToUnhide = [];
     let nodesToUnhide = [];
-    const parentNodeId = yesNode.id.split('-')[0];
+    const parentNodeId = getParentNodeIdFromYesNodeId(yesNode.id);
 
     setEdges(prevEdges => {
       edgesToUnhide = prevEdges.filter(edge => edge.source === yesNode.id || edge.target === yesNode.id);

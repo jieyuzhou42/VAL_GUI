@@ -11,11 +11,11 @@ const socket = io('http://localhost:4002', {
 });
 
 const POSITION_CONSTANTS = {
-  PARENT_TO_CHATBOT_OFFSET_X: 150,
+  PARENT_TO_CHATBOT_OFFSET_X: 50,
   PARENT_TO_CHATBOT_OFFSET_Y: 0,
-  CHATBOT_NODE_OFFSET_X: 80,
-  CHATBOT_NODE_OFFSET_Y: 0,
-  CHATBOT_VISIBLE_SHIFT_X: 340,
+  CHATBOT_NODE_OFFSET_X: 150,
+  CHATBOT_NODE_OFFSET_Y: -200,
+  CHATBOT_VISIBLE_SHIFT_X: 400,
 };
 
 const findTaskNodeByHash = (nodes, taskHash) => nodes.find(node => node.id === taskHash);
@@ -78,7 +78,7 @@ function App () {
 
         setNodes(prevNodes =>
           prevNodes.map(node => {
-            if (node.position.x > chatbotPosition.x + 200 && node.id !== 'chatbot-node') {
+            if (node.position.x > chatbotPosition.x - 50 && node.id !== 'chatbot-node') {
               if (!movedNodesRef.current.has(node.id)) {
                 movedNodesRef.current.set(node.id, node.position.x);
               }

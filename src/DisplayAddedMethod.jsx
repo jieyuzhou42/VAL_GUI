@@ -46,6 +46,7 @@ const getTaskNodeStyle = (background, extra = {}) => ({
   background,
   ...extra,
 });
+const getParentNodeIdFromYesNodeId = (yesNodeId = '') => yesNodeId.split('-unhide-')[0];
 
 const getChildY = (parentY, index, total, spacing = LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING) => {
   if (total <= 1) return parentY;
@@ -152,6 +153,7 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
   
       const newNodes = [];
       const newEdges = [];
+      const childColumnX = getNextColumnX(parentNode.position.x);
       const siblingShift = getSiblingShiftGroups(
         parentNode,
         edges,
@@ -164,14 +166,15 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
   
       // Create child nodes for each subtask (only if they don't already exist)
       data.subtasks[0].forEach((task, subIndex) => {
-        if (existingNodeIds.has(task.hash)) {
+        const taskNodeId = task.hash;
+        if (existingNodeIds.has(taskNodeId)) {
           return; // Skip creating this node
         }
         
         const taskNode = {
-          id: task.hash,
+          id: taskNodeId,
           position: { 
-            x: getNextColumnX(parentNode.position.x),
+            x: childColumnX,
             y: getChildY(parentNode.position.y, subIndex, data.subtasks[0].length)
           },
           data: { 
@@ -261,11 +264,11 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       setNodes(prevNodes => prevNodes.filter(node => node.id !== 'noNode' && node.id !== 'add method'));
   
       setEdges(prevEdges => {
-        const newEdges = [];
-        const updatedEdges = prevEdges.map(edge => {
-          if (edge.source.includes('unhide')) {
-            const parentNodeId = edge.id.split('-')[1];
-            const newEdgeId = `e-${parentNodeId}-${edge.target}`;
+      const newEdges = [];
+      const updatedEdges = prevEdges.map(edge => {
+        if (edge.source.includes('unhide')) {
+          const parentNodeId = getParentNodeIdFromYesNodeId(edge.source);
+          const newEdgeId = `e-${parentNodeId}-${edge.target}`;
     
             // Add new edge to the parent node
             if (!prevEdges.some(e => e.id === newEdgeId)) {
@@ -384,7 +387,7 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
   
       let edgesToUnhide = [];
       let nodesToUnhide = [];
-      const parentNodeId = yesNode.id.split('-')[0];
+      const parentNodeId = getParentNodeIdFromYesNodeId(yesNode.id);
   
       setEdges(prevEdges => {
         edgesToUnhide = prevEdges.filter(edge => edge.source === yesNode.id || edge.target === yesNode.id);
