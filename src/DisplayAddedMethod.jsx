@@ -2,7 +2,6 @@ import { useEffect,useState,useRef } from "react";
 import '@xyflow/react/dist/style.css';
 import { MarkerType, SimpleBezierEdge } from '@xyflow/react';
 
-
 const currentNodeColor = 'rgb(205, 221, 249)';
 const currentEdgeColor = 'rgb(132, 171, 249)';
 const nextNodeColor = 'rgb(222, 222, 222)';
@@ -15,35 +14,129 @@ const SUBTASK_CONSTANTS = {
   SUBTASK_VERTICAL_SPACING: 150, // Must match confirm_best_match_decomposition
 };
 
+const LAYOUT_CONSTANTS = {
+  YESNODE_OFFSET_X: 250,
+  YESNODE_OFFSET_Y: 0,
+  YESNODE_TO_SUBTASK_X: 110,
+  SUBTASK_VERTICAL_SPACING: 135,
+  CHATBOT_COLLAPSE_X: 150,
+  SIBLING_CLEARANCE_Y: 36,
+  LEVEL_GAP_X: 360,
+};
+
+const TASK_NODE_STYLE = {
+  border: 'none',
+  width: 170,
+  minWidth: 170,
+  height: 40,
+  borderRadius: 10,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  textAlign: 'center',
+  padding: '0 12px',
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const getTaskNodeStyle = (background, extra = {}) => ({
+  ...TASK_NODE_STYLE,
+  background,
+  ...extra,
+});
+
+const getChildY = (parentY, index, total, spacing = LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING) => {
+  if (total <= 1) return parentY;
+  const startY = parentY - ((total - 1) * spacing) / 2;
+  return startY + index * spacing;
+};
+
+const getNextColumnX = (parentX) => parentX + LAYOUT_CONSTANTS.LEVEL_GAP_X;
+const findTaskNodeByHash = (nodes, taskHash) => nodes.find(node => node.id === taskHash);
+
+const findDescendantIds = (startIds, edges) => {
+  const descendants = new Set();
+  const stack = [...startIds];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    edges.forEach(edge => {
+      if (edge.source === current && !descendants.has(edge.target)) {
+        descendants.add(edge.target);
+        stack.push(edge.target);
+      }
+    });
+  }
+
+  return descendants;
+};
+
+const collectShiftNodeIds = (rootIds, edges, nodes) => {
+  const ids = new Set([...rootIds, ...findDescendantIds(rootIds, edges)]);
+  const controlSuffixes = ['-edit', '-trash', '-add', '-confirm'];
+  const taskIds = [...ids];
+
+  taskIds.forEach(id => {
+    controlSuffixes.forEach(suffix => {
+      const controlId = `${id}${suffix}`;
+      if (nodes.some(node => node.id === controlId)) {
+        ids.add(controlId);
+      }
+    });
+  });
+
+  return ids;
+};
+
+const getSiblingShiftGroups = (parentNode, edges, nodes, childCount) => {
+  const incomingEdge = edges.find(edge => edge.target === parentNode.id);
+  if (!incomingEdge || childCount <= 1) {
+    return { shiftAmount: 0, upwardIds: new Set(), downwardIds: new Set() };
+  }
+
+  const shiftAmount =
+    Math.ceil(((childCount - 1) * LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING) / 2) +
+    LAYOUT_CONSTANTS.SIBLING_CLEARANCE_Y;
+  const upwardIds = new Set();
+  const downwardIds = new Set();
+
+  edges
+    .filter(edge => edge.source === incomingEdge.source)
+    .map(edge => edge.target)
+    .filter(targetId => targetId !== parentNode.id)
+    .forEach(targetId => {
+      const siblingNode = nodes.find(node => node.id === targetId);
+      if (!siblingNode) return;
+
+      const subtreeIds = collectShiftNodeIds([targetId], edges, nodes);
+      const bucket = siblingNode.position.y < parentNode.position.y ? upwardIds : downwardIds;
+      subtreeIds.forEach(id => bucket.add(id));
+    });
+
+  return { shiftAmount, upwardIds, downwardIds };
+};
+
 
 function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, setEdges}) {
     useEffect(() => {
-      console.log("=== DisplayAddedMethod component mounted ===");
-      console.log("Current nodes:", nodes.map(n => n.id));
-      console.log("Looking for chatbot-node:", nodes.some(n => n.id === 'chatbot-node'));
-      console.log("Looking for chatbot-placeholder:", nodes.some(n => n.id === 'chatbot-placeholder'));
       
-      let parentNode = nodes.find(n => n.id.includes(data.head.hash));
+      let parentNode = findTaskNodeByHash(nodes, data.head.hash);
   
       if (!parentNode) {
         // If node is empty, create the parent node
-        console.log("No parent node found. Creating parent node.");
         parentNode = {
           id: data.head.hash,
           position: { x: 0, y: 0 },
           data: { label: `${data.head.name} ${data.head.V}` },
-          style: { 
-            border: 'none',
-            background: currentNodeColor,
-          },
+          style: getTaskNodeStyle(currentNodeColor),
           sourcePosition: 'right',
           targetPosition: 'left',
         };
   
         setNodes(prev => [...prev, parentNode]);
       } else {
-        console.log("Parent node found:", parentNode);
-        console.log("=== Skipping hide/show and color logic in DisplayAddedMethod ===");
         // NO LONGER HIDING NODES OR CHANGING COLORS
         // We want to show all approved decomposition trees
       }
@@ -57,18 +150,14 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       // User already approved via chatbot, so we don't need approve button
       // Just proceed to showing subtasks directly connected to parent
   
-      console.log(" Checking if subtasks need to be created.", nodes);
       const newNodes = [];
       const newEdges = [];
-      
-      // Use same yesNode position logic as confirm_best_match_decomposition
-      const yesNodeX = parentNode.position.x + SUBTASK_CONSTANTS.YESNODE_OFFSET_X;
-      
-      // Find the specific placeholder for this parent node (unique ID: placeholder-{parentHash})
-      const placeholderId = `placeholder-${parentNode.id}`;
-      const chatbotPlaceholder = nodes.find(n => n.id === placeholderId);
-      console.log('Looking for placeholder:', placeholderId);
-      console.log('Found placeholder:', chatbotPlaceholder);
+      const siblingShift = getSiblingShiftGroups(
+        parentNode,
+        edges,
+        nodes,
+        data.subtasks[0]?.length || 0
+      );
       
       // Check which subtasks already exist (created by handleConfirm)
       const existingNodeIds = new Set(nodes.map(n => n.id));
@@ -76,16 +165,14 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       // Create child nodes for each subtask (only if they don't already exist)
       data.subtasks[0].forEach((task, subIndex) => {
         if (existingNodeIds.has(task.hash)) {
-          console.log('Subtask node already exists:', task.hash);
           return; // Skip creating this node
         }
         
-        console.log('Creating new subtask node:', task.hash);
         const taskNode = {
           id: task.hash,
           position: { 
-            x: yesNodeX + SUBTASK_CONSTANTS.YESNODE_TO_SUBTASK_X,
-            y: parentNode.position.y + subIndex * SUBTASK_CONSTANTS.SUBTASK_VERTICAL_SPACING
+            x: getNextColumnX(parentNode.position.x),
+            y: getChildY(parentNode.position.y, subIndex, data.subtasks[0].length)
           },
           data: { 
             label: `${task.task_name} ${task.args}`,
@@ -93,10 +180,7 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
             args: task.args,
             hash: task.hash
           },
-          _style: {
-            background: currentNodeColor,
-            border: 'none',
-          },
+          _style: getTaskNodeStyle(currentNodeColor),
           get style() {
             return this._style;
           },
@@ -109,13 +193,10 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
   
         newNodes.push(taskNode);
   
-        console.log('taskNode background:', taskNode?.style?.background);
   
-        // Add edge from placeholder (if exists) or parent to task node
-        const sourceNode = chatbotPlaceholder || parentNode;
         newEdges.push({
-          id: `e-${sourceNode.id}-${taskNode.id}`,
-          source: sourceNode.id,
+          id: `e-${parentNode.id}-${taskNode.id}`,
+          source: parentNode.id,
           target: `${taskNode.id}`,
           markerEnd: {
             type: MarkerType.Arrow,
@@ -129,19 +210,42 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
         });
       });
       
-      console.log('New nodes to create:', newNodes.length);
-      console.log('New edges to create:', newEdges.length);
   
     // Only add nodes that don't already exist
     if (newNodes.length > 0) {
-      setNodes(prev => [...prev, ...newNodes]);
+      setNodes(prev => {
+        const shiftedPrev = prev.map(node => {
+          if (siblingShift.upwardIds.has(node.id)) {
+            return {
+              ...node,
+              position: {
+                ...node.position,
+                y: node.position.y - siblingShift.shiftAmount,
+              },
+            };
+          }
+
+          if (siblingShift.downwardIds.has(node.id)) {
+            return {
+              ...node,
+              position: {
+                ...node.position,
+                y: node.position.y + siblingShift.shiftAmount,
+              },
+            };
+          }
+
+          return node;
+        });
+
+        return [...shiftedPrev, ...newNodes];
+      });
     }
     
     // Filter out duplicate edges before adding
     setEdges(prev => {
       const existingEdgeIds = new Set(prev.map(e => e.id));
       const uniqueNewEdges = newEdges.filter(e => !existingEdgeIds.has(e.id));
-      console.log('Adding edges:', uniqueNewEdges.length, 'out of', newEdges.length, 'new edges');
       return [...prev, ...uniqueNewEdges];
     });
     
@@ -150,7 +254,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
     
     // User already approved via chatbot, automatically send response to backend
     // to continue the flow
-    console.log("Automatically sending response_decomposition to continue flow...");
     socket.emit("message", { type: 'response_decomposition', response: 0 });
     }, [data]);
 
@@ -180,8 +283,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
           return {...edge};
         });
     
-        console.log('Updated edges:', updatedEdges);
-        console.log('New edges:', newEdges);
     
         return [...updatedEdges, ...newEdges];
       });
@@ -191,16 +292,20 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
     // every confirsmation step has confirm, more options, add method and edit as options
     const handleConfirm = (yesNode, index, parentNode) => {
       socket.emit("message", { type: 'response_decomposition', response: index });
-      console.log("User confirmed decomposition");
     
       let nodesToKeep = new Set();
       let nodesToRemove = new Set();
       let yesNodeIdsToRemove = [];
-      const offsetY = index > 0 ? (index - 1) * 100 : 0;
+      const offsetY = index > 0
+        ? (index - 1) * (LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING + LAYOUT_CONSTANTS.SIBLING_CLEARANCE_Y)
+        : 0;
       const directTaskNodeIds = edges
       .filter(edge => edge.source === yesNode.id)
       .map(edge => edge.target);
-      console.log("Direct task node ids:", directTaskNodeIds);
+      const shiftedSubtreeNodeIds = new Set([
+        ...directTaskNodeIds,
+        ...findDescendantIds(directTaskNodeIds, edges),
+      ]);
     
   
       setEdges(prevEdges => {
@@ -243,7 +348,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       return prevNodes.map(node => {
         
         if (node.id === yesNode.id) {
-          console.log("Moving yesNode:", node.id, "from", node.position.y, "to", node.position.y - offsetY);
           return {
             ...node,
             hidden: true,
@@ -259,8 +363,7 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
           };
         } else if (nodesToRemove.has(node.id)) {
           return null;
-        } else if (directTaskNodeIds.includes(node.id)) {
-          console.log("Moving task node:", node.id, "from", node.position.y, "to", node.position.y - offsetY);
+        } else if (shiftedSubtreeNodeIds.has(node.id)) {
           return {
             ...node,
             position: {
@@ -278,7 +381,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
     };
 
     const handleUnhide = (yesNode) => {
-      console.log("unhide clicked");
   
       let edgesToUnhide = [];
       let nodesToUnhide = [];
@@ -302,7 +404,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       setNodes(prevNodes => {
         const updatedNodes = prevNodes.map(node => {
           if (node.id === yesNode.id) {
-            console.log('Setting yes node to unhide:', node);
             return {
               ...node,
               style: {
@@ -316,7 +417,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
               }
             };
           } else if (nodesToUnhide.includes(node.id)) {
-            console.log('Setting node to unhide:', node);
             return { ...node, hidden: false };
           } 
           return node;
@@ -327,7 +427,6 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
     };
   
     const handleHide = (yesNode) => {
-      console.log("hide clicked");
   
       let edgesToHide = [];
       let nodesToHide = [];

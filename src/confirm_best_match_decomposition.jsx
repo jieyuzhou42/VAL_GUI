@@ -2,7 +2,6 @@ import { useEffect,useState,useRef } from "react";
 import '@xyflow/react/dist/style.css';
 import { MarkerType, SimpleBezierEdge } from '@xyflow/react';
 
-
 const currentNodeColor = 'rgb(205, 221, 249)';
 const currentEdgeColor = 'rgb(132, 171, 249)';
 const nextNodeColor = 'rgb(222, 222, 222)';
@@ -16,7 +15,156 @@ const SUBTASK_CONSTANTS = {
   SUBTASK_VERTICAL_SPACING: 150, // Vertical spacing between subtasks
 };
 
-//utility 
+const findTaskNodeByHash = (nodes, taskHash) => nodes.find(node => node.id === taskHash);
+const isControlNodeId = (nodeId = '') =>
+  nodeId === 'chatbot-node' ||
+  nodeId === 'create-new-method' ||
+  nodeId.endsWith('-edit') ||
+  nodeId.endsWith('-trash') ||
+  nodeId.endsWith('-add') ||
+  nodeId.endsWith('-confirm') ||
+  nodeId.includes('-unhide-');
+const isTaskContentNode = (node) => !!node && !isControlNodeId(node.id) && typeof node.data?.task_name === 'string';
+const createTreeEdge = (sourceId, targetId, color = currentEdgeColor) => ({
+  id: `e-${sourceId}-${targetId}`,
+  source: sourceId,
+  target: targetId,
+  markerEnd: {
+    type: MarkerType.Arrow,
+    strokeWidth: 2,
+    color,
+  },
+  style: {
+    strokeWidth: 2,
+    stroke: color,
+  },
+});
+
+const LAYOUT_CONSTANTS = {
+  YESNODE_OFFSET_X: 250,
+  YESNODE_OFFSET_Y: 0,
+  YESNODE_TO_SUBTASK_X: 110,
+  SUBTASK_VERTICAL_SPACING: 135,
+  OPTION_TO_TASK_X: 220,
+  CHATBOT_COLLAPSE_X: 150,
+  SIBLING_CLEARANCE_Y: 36,
+  LEVEL_GAP_X: 360,
+  OPTION_SELECT_OFFSET_X: 120,
+};
+
+const TASK_NODE_STYLE = {
+  border: 'none',
+  width: 170,
+  minWidth: 170,
+  height: 40,
+  borderRadius: 10,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  textAlign: 'center',
+  padding: '0 12px',
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const getTaskNodeStyle = (background, extra = {}) => ({
+  ...TASK_NODE_STYLE,
+  background,
+  ...extra,
+});
+
+const getEditableTaskNodeStyle = (extra = {}) => ({
+  ...TASK_NODE_STYLE,
+  background: currentNodeColor,
+  width: 250,
+  minWidth: 250,
+  height: 64,
+  padding: '8px 12px',
+  overflow: 'visible',
+  textOverflow: 'clip',
+  whiteSpace: 'normal',
+  ...extra,
+});
+
+const TASK_ACTION_OFFSET_X = 182;
+const TASK_ACTION_TRASH_OFFSET_X = 207;
+const TASK_ACTION_ADD_OFFSET_X = 232;
+const EDITABLE_ACTION_CONFIRM_OFFSET_X = 262;
+const EDITABLE_ACTION_TRASH_OFFSET_X = 287;
+const EDITABLE_ACTION_ADD_OFFSET_X = 312;
+
+const getChildY = (parentY, index, total, spacing = LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING) => {
+  if (total <= 1) return parentY;
+  const startY = parentY - ((total - 1) * spacing) / 2;
+  return startY + index * spacing;
+};
+
+const getNextColumnX = (parentX) => parentX + LAYOUT_CONSTANTS.LEVEL_GAP_X;
+
+const findDescendantIds = (startIds, edges) => {
+  const descendants = new Set();
+  const stack = [...startIds];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    edges.forEach(edge => {
+      if (edge.source === current && !descendants.has(edge.target)) {
+        descendants.add(edge.target);
+        stack.push(edge.target);
+      }
+    });
+  }
+
+  return descendants;
+};
+
+const collectShiftNodeIds = (rootIds, edges, nodes) => {
+  const ids = new Set([...rootIds, ...findDescendantIds(rootIds, edges)]);
+  const controlSuffixes = ['-edit', '-trash', '-add', '-confirm'];
+  const taskIds = [...ids];
+
+  taskIds.forEach(id => {
+    controlSuffixes.forEach(suffix => {
+      const controlId = `${id}${suffix}`;
+      if (nodes.some(node => node.id === controlId)) {
+        ids.add(controlId);
+      }
+    });
+  });
+
+  return ids;
+};
+
+const getSiblingShiftGroups = (parentNode, edges, nodes, childCount) => {
+  const incomingEdge = edges.find(edge => edge.target === parentNode.id);
+  if (!incomingEdge || childCount <= 1) {
+    return { shiftAmount: 0, upwardIds: new Set(), downwardIds: new Set() };
+  }
+
+  const shiftAmount =
+    Math.ceil(((childCount - 1) * LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING) / 2) +
+    LAYOUT_CONSTANTS.SIBLING_CLEARANCE_Y;
+  const upwardIds = new Set();
+  const downwardIds = new Set();
+
+  edges
+    .filter(edge => edge.source === incomingEdge.source)
+    .map(edge => edge.target)
+    .filter(targetId => targetId !== parentNode.id)
+    .forEach(targetId => {
+      const siblingNode = nodes.find(node => node.id === targetId);
+      if (!siblingNode) return;
+
+      const subtreeIds = collectShiftNodeIds([targetId], edges, nodes);
+      const bucket = siblingNode.position.y < parentNode.position.y ? upwardIds : downwardIds;
+      subtreeIds.forEach(id => bucket.add(id));
+    });
+
+  return { shiftAmount, upwardIds, downwardIds };
+};
+
 function findAllAncestors(nodeId, edges) {
   const ancestors = new Set();
   const stack = [nodeId];
@@ -34,11 +182,6 @@ function findAllAncestors(nodeId, edges) {
 
 function ConfirmBestMatchDecomposition({ data, socket, onConfirm,
         nodes, edges, setNodes, setEdges, readOnly = false }) {
-  console.log('=== ConfirmBestMatchDecomposition COMPONENT MOUNTED ===');
-  console.log("nodes in ConfirmDecomp:", nodes);
-  console.log('edges in ConfirmDecomp:', edges);
-  console.log('data:', data);
-  console.log('readOnly:', readOnly);
   const [showAllOptions, setShowAllOptions] = useState(false);
   const [selectedMethodIndex, setSelectedMethodIndex] = useState(0); // Track selected method
   const [isEditMode, setIsEditMode] = useState(false); // Track if in edit mode
@@ -56,10 +199,8 @@ useEffect(() => {
 // Listen for create method event from chatbot
 useEffect(() => {
   const handleCreateMethodFromChatbot = (event) => {
-    console.log('Received start_gui_create_method event from chatbot');
-    const parentNode = nodes.find(n => n.id.includes(data.head.hash));
+    const parentNode = findTaskNodeByHash(nodes, data.head.hash);
     if (!parentNode) {
-      console.warn('Parent node not found for creating new method');
       return;
     }
     
@@ -73,7 +214,7 @@ useEffect(() => {
     const newNode = {
       id: newTaskId,
       position: {
-        x: parentNode.position.x + 300,
+        x: getNextColumnX(parentNode.position.x),
         y: parentNode.position.y
       },
       data: {
@@ -119,7 +260,7 @@ useEffect(() => {
         dropdown1: defaultTaskName,
         dropdown2: defaultArg
       },
-      style: { background: currentNodeColor, border: 'none' },
+      style: getEditableTaskNodeStyle(),
       sourcePosition: 'right',
       targetPosition: 'left',
     };
@@ -128,7 +269,7 @@ useEffect(() => {
     const confirmButtonNode = {
       id: `${newTaskId}-confirm`,
       position: {
-        x: newNode.position.x + 130,
+        x: newNode.position.x + EDITABLE_ACTION_CONFIRM_OFFSET_X,
         y: newNode.position.y + 30,
       },
       data: {
@@ -153,7 +294,7 @@ useEffect(() => {
     const trashButtonNode = {
       id: `${newTaskId}-trash`,
       position: {
-        x: newNode.position.x + 155,
+        x: newNode.position.x + EDITABLE_ACTION_TRASH_OFFSET_X,
         y: newNode.position.y + 30,
       },
       data: {
@@ -178,7 +319,7 @@ useEffect(() => {
     const addButtonNode = {
       id: `${newTaskId}-add`,
         position: { 
-        x: newNode.position.x + 180,
+        x: newNode.position.x + EDITABLE_ACTION_ADD_OFFSET_X,
         y: newNode.position.y + 30,
         },
         data: { 
@@ -227,82 +368,65 @@ useEffect(() => {
 
 
   useEffect(() => {
-    console.log('=== ConfirmBestMatchDecomposition MAIN useEffect TRIGGERED ===');
-    console.log('Current nodes:', nodes);
-    console.log('data.head.hash:', data.head.hash);
-    console.log('data.subtasks:', data.subtasks);
     
-    let parentNode = nodes.find(n => n.id.includes(data.head.hash));
-    console.log('Found parent node:', parentNode);
+    let parentNode = findTaskNodeByHash(nodes, data.head.hash);
 
     if (!parentNode) {
       // If node is empty, create the parent node
-      console.log("=== No parent node found. Creating parent node ===");
       parentNode = {
         id: data.head.hash,
         position: { x: 0, y: 0 },
         data: { label: `${data.head.name} ${data.head.V}` },
-        style: { 
-          border: 'none',
-          background: currentNodeColor,
-        },
+        style: getTaskNodeStyle(currentNodeColor),
         sourcePosition: 'right',
         targetPosition: 'left',
       };
 
-      console.log('=== Adding parent node to nodes ===');
-      console.log('Parent node to add:', parentNode);
       setNodes(prev => {
-        console.log('Previous nodes before adding parent:', prev);
         const newNodes = [...prev, parentNode];
-        console.log('New nodes after adding parent:', newNodes);
         return newNodes;
       });
     } else {
-      console.log("=== Parent node found:", parentNode, '===');
-      console.log("=== Skipping hide/show logic - keeping all approved nodes visible ===");
       // NO LONGER HIDING NODES - we want to show all approved decomposition trees
     }
 
     ///////NO LONGER CHANGING COLORS - keep all nodes at default color//////////
-    console.log("=== Skipping color changes - all approved nodes keep their original color ===");
 
     // if there is no subtask just update the highlighted path and return
     if (data.subtasks.length === 0) {
       if (!readOnly) {
         socket.emit("message", {type: 'response_decomposition_with_edit', response: {user_choice: 'add_method'}});
-        console.log("User confirmed decomposition with no subtask");
         onConfirm(null);
       }
       return;
     }
 
     // No approve/reject buttons in GUI anymore - all handled by chatbot
-    // yesNode position should align with chatbot-placeholder position for consistency
-    // placeholder.x = chatbotPosition.x + 100 = (parent.x + 200) + 100 = parent.x + 300
     const yesNode = {
       id: `${data.head.hash}-unhide-0`,
       position: { 
-        x: parentNode.position.x + SUBTASK_CONSTANTS.YESNODE_OFFSET_X,
-        y: parentNode.position.y + SUBTASK_CONSTANTS.YESNODE_OFFSET_Y
+        x: getNextColumnX(parentNode.position.x) - LAYOUT_CONSTANTS.YESNODE_TO_SUBTASK_X,
+        y: parentNode.position.y + LAYOUT_CONSTANTS.YESNODE_OFFSET_Y
       }
     };
 
     const newNodes = [];
     const newEdges = [];
+    const siblingShift = getSiblingShiftGroups(
+      parentNode,
+      edges,
+      nodes,
+      data.subtasks[0]?.length || 0
+    );
 
-    console.log('=== Creating subtask nodes ===');
-    console.log('Number of subtasks:', data.subtasks[0]?.length || 0);
-    console.log('yesNode position:', yesNode.position);
     
     // Create child nodes for each subtask
     data.subtasks[0].forEach((task, subIndex) => {
-      console.log(`Creating subtask ${subIndex}:`, task);
       const taskNode = {
         id: task.hash,
         position: { 
-          x: yesNode.position.x + SUBTASK_CONSTANTS.YESNODE_TO_SUBTASK_X,
-          y: parentNode.position.y + subIndex *(150/(parentNode.position.x/200+1))
+          x: getNextColumnX(parentNode.position.x),
+          y: getChildY(parentNode.position.y, subIndex, data.subtasks[0].length)
         },
         data: { 
           label: `${task.task_name} ${task.args}`,
@@ -312,10 +436,7 @@ useEffect(() => {
         },
         // debugging
         // data: {label: `${task.hash}-${task.task_name}`},
-        _style: {
-          background: currentNodeColor,
-          border: 'none',
-        },
+        _style: getTaskNodeStyle(currentNodeColor),
         get style() {
           return this._style;
         },
@@ -328,66 +449,14 @@ useEffect(() => {
 
       newNodes.push(taskNode);
 
-      // Check if chatbot or placeholder node exists to determine edge routing
-      const chatbotNode = nodes.find(n => n.id === 'chatbot-node');
-      const placeholderNode = nodes.find(n => n.id === 'chatbot-placeholder');
-      
-      if (chatbotNode) {
-        // If chatbot exists, connect from chatbot to subtasks
-      newEdges.push({
-          id: `e-chatbot-${taskNode.id}`,
-          source: 'chatbot-node',
-        target: `${taskNode.id}`,
-        markerEnd: {
-          type: MarkerType.Arrow,
-          strokeWidth: 2,
-          color: currentEdgeColor,
-        },
-        style: {
-          strokeWidth: 2,
-          stroke: currentEdgeColor,
-        },
-        });
-      } else if (placeholderNode) {
-        // If placeholder exists, connect from placeholder to subtasks
-        newEdges.push({
-          id: `e-placeholder-${taskNode.id}`,
-          source: 'chatbot-placeholder',
-          target: `${taskNode.id}`,
-          markerEnd: {
-            type: MarkerType.Arrow,
-            strokeWidth: 2,
-            color: currentEdgeColor,
-          },
-          style: {
-            strokeWidth: 2,
-            stroke: currentEdgeColor,
-          },
-        });
-      } else {
-        // No chatbot or placeholder: connect directly from parent to subtasks
-        newEdges.push({
-          id: `e-${parentNode.id}-${taskNode.id}`,
-          source: parentNode.id,
-          target: `${taskNode.id}`,
-          markerEnd: {
-            type: MarkerType.Arrow,
-            strokeWidth: 2,
-            color: currentEdgeColor,
-          },
-          style: {
-            strokeWidth: 2,
-            stroke: currentEdgeColor,
-          },
-        });
-      }
+      newEdges.push(createTreeEdge(parentNode.id, `${taskNode.id}`));
 
       // if (subIndex === 0) {
       // Add edit button next to the task node
       const editButtonNode = {
         id: `${task.hash}-edit`,
         position: {
-          x: taskNode.position.x + 155, // Position next to the task node
+          x: taskNode.position.x + TASK_ACTION_OFFSET_X,
           y: taskNode.position.y,
         },
         data: {
@@ -413,14 +482,32 @@ useEffect(() => {
       // }
     });
 
-  console.log('=== Adding all subtask nodes to state ===');
-  console.log('New nodes to add:', newNodes.length);
-  console.log('New nodes:', newNodes.map(n => n.id));
   
   setNodes(prev => {
-    console.log('Previous nodes before adding subtasks:', prev.length);
-    const result = [...prev, ...newNodes];
-    console.log('Total nodes after adding subtasks:', result.length);
+    const shiftedPrev = prev.map(node => {
+      if (siblingShift.upwardIds.has(node.id)) {
+        return {
+          ...node,
+          position: {
+            ...node.position,
+            y: node.position.y - siblingShift.shiftAmount,
+          },
+        };
+      }
+
+      if (siblingShift.downwardIds.has(node.id)) {
+        return {
+          ...node,
+          position: {
+            ...node.position,
+            y: node.position.y + siblingShift.shiftAmount,
+          },
+        };
+      }
+
+      return node;
+    });
+    const result = [...shiftedPrev, ...newNodes];
     return result;
   });
   
@@ -428,7 +515,6 @@ useEffect(() => {
     // Filter out existing edges to prevent duplicates
     const existingEdgeIds = new Set(prev.map(e => e.id));
     const newUniqueEdges = newEdges.filter(e => !existingEdgeIds.has(e.id));
-    console.log('Adding edges:', newUniqueEdges.length);
     return [...prev, ...newUniqueEdges];
   });
   }, [data]);
@@ -439,49 +525,27 @@ useEffect(() => {
   // Consider removing this effect entirely
   useEffect(() => {
     const chatbotNode = nodes.find(n => n.id === 'chatbot-node');
-    const placeholderNode = nodes.find(n => n.id === 'chatbot-placeholder');
-    const parentNode = nodes.find(n => n.id.includes(data.head.hash));
+    const parentNode = findTaskNodeByHash(nodes, data.head.hash);
     
-    if (parentNode && chatbotNode && !placeholderNode) {
+    if (parentNode && chatbotNode) {
       // Only create parent → chatbot edge if chatbot exists and no placeholder yet
       const edgeId = `e-${parentNode.id}-chatbot`;
-      const edgeExists = edges.some(e => e.id === edgeId);
-      
-      if (!edgeExists) {
-        setEdges(prev => [...prev, {
-          id: edgeId,
-          source: parentNode.id,
-          target: 'chatbot-node',
-          markerEnd: {
-            type: MarkerType.Arrow,
-            strokeWidth: 2,
-            color: currentEdgeColor,
-          },
-          style: {
-            strokeWidth: 2,
-            stroke: currentEdgeColor,
-          },
-        }]);
-      }
+      setEdges(prev => prev);
     }
-  }, [nodes.find(n => n.id === 'chatbot-node')]); // Only re-run when chatbot appears (not placeholder)
+  }, [nodes, edges, data.head.hash]);
   
   // Effect 1.6: Listen for chatbot approve/reject and trigger handleConfirm
   useEffect(() => {
     const handleChatbotAction = (event) => {
-      console.log('=== EVENT LISTENER TRIGGERED ===');
-      console.log('Event:', event);
-      console.log('Event detail:', event.detail);
       
       const { action, index } = event.detail;
-      console.log('Chatbot action received:', action, 'index:', index);
       
-      const parentNode = nodes.find(n => n.id.includes(data.head.hash));
+      const parentNode = findTaskNodeByHash(nodes, data.head.hash);
       const yesNode = {
         id: `${data.head.hash}-unhide-0`,
         position: {
-          x: parentNode?.position.x + 250 || 250,
-          y: parentNode?.position.y + 3.5 || 3.5
+          x: parentNode?.position.x + LAYOUT_CONSTANTS.YESNODE_OFFSET_X || LAYOUT_CONSTANTS.YESNODE_OFFSET_X,
+          y: parentNode?.position.y + LAYOUT_CONSTANTS.YESNODE_OFFSET_Y || LAYOUT_CONSTANTS.YESNODE_OFFSET_Y
         }
       };
       
@@ -492,7 +556,6 @@ useEffect(() => {
     };
     
     const handleShowAllMethods = (event) => {
-      console.log('Show all methods triggered');
       setShowAllOptions(true);
     };
     
@@ -511,22 +574,31 @@ useEffect(() => {
     const parentNode = nodes.find(n => n.id === data.head.hash);
     if (!parentNode) return;
     
-    console.log('Rendering all method options, total methods:', data.subtasks.length);
     
-    // Find the chatbot-placeholder to align with it (same X as best match)
-    const chatbotPlaceholder = nodes.find(n => n.id === 'chatbot-placeholder');
-    const selectButtonX = chatbotPlaceholder ? chatbotPlaceholder.position.x : parentNode.position.x + 300;
+    const selectButtonX = getNextColumnX(parentNode.position.x) - LAYOUT_CONSTANTS.OPTION_SELECT_OFFSET_X;
     
     // Calculate the bottom Y position of best match subtasks
     const bestMatchSubtasks = data.subtasks[0] || [];
-    const bestMatchBottomY = parentNode.position.y + (bestMatchSubtasks.length - 1) * 50;
-    const startingYOffset = 100; // Gap between best match and first other method
+    const optionSpacing = LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING;
+    const optionGap = 80;
+    const bestMatchBottomY = getChildY(
+      parentNode.position.y,
+      Math.max(bestMatchSubtasks.length - 1, 0),
+      Math.max(bestMatchSubtasks.length, 1),
+      optionSpacing
+    );
+    const startingYOffset = optionGap;
     
     // Best match (index 0) already rendered, start from index 1
     data.subtasks.slice(1).forEach((option, idx) => {
       const realIdx = idx + 1; // Actual index in data.subtasks
       // Calculate Y position: below best match + spacing for previous other methods
-      const previousMethodsHeight = idx > 0 ? data.subtasks.slice(1, realIdx - 1).reduce((sum, opt) => sum + opt.length * 50 + 50, 0) : 0;
+      const previousMethodsHeight = idx > 0
+        ? data.subtasks.slice(1, realIdx - 1).reduce(
+            (sum, opt) => sum + opt.length * optionSpacing + optionGap,
+            0
+          )
+        : 0;
       const baseY = bestMatchBottomY + startingYOffset + previousMethodsHeight;
       const selectNodeId = `${data.head.hash}-select-${realIdx}`;
       
@@ -580,24 +652,9 @@ useEffect(() => {
         }));
       }
       
-      // Add edge from chatbot-placeholder (or parent) to select button
-      const sourceNode = chatbotPlaceholder || parentNode;
-      setEdges(prev => prev.some(e => e.id === `e-${sourceNode.id}-${selectNodeId}`)
+      setEdges(prev => prev.some(e => e.id === `e-${parentNode.id}-${selectNodeId}`)
         ? prev
-        : [...prev, {
-            id: `e-${sourceNode.id}-${selectNodeId}`,
-            source: sourceNode.id,
-            target: selectNodeId,
-            markerEnd: {
-              type: MarkerType.Arrow,
-              strokeWidth: 2,
-              color: currentEdgeColor
-            },
-            style: {
-              strokeWidth: 2,
-              stroke: currentEdgeColor
-            }
-          }]
+        : [...prev, createTreeEdge(parentNode.id, selectNodeId)]
       );
       
       // Render subtasks for this method
@@ -606,8 +663,8 @@ useEffect(() => {
         const taskNode = {
           id: taskId,
           position: {
-            x: selectButtonX + 450, // Position subtasks same offset as best match (450 from select button)
-            y: baseY + i * 50
+            x: getNextColumnX(parentNode.position.x),
+            y: baseY + i * optionSpacing
           },
           data: { 
             label: `${task.task_name} ${task.args || ''}`,
@@ -615,10 +672,9 @@ useEffect(() => {
             args: task.args,
             hash: task.hash
           },
-          style: {
-            background: realIdx === selectedMethodIndex ? currentNodeColor : nextNodeColor,
-            border: 'none'
-          },
+          style: getTaskNodeStyle(
+            realIdx === selectedMethodIndex ? currentNodeColor : nextNodeColor
+          ),
           sourcePosition: 'right',
           targetPosition: 'left'
         };
@@ -650,7 +706,7 @@ useEffect(() => {
     // Add "+ Create Method" button at the bottom of all options
     // Calculate Y position: below all other methods
     const totalOtherMethodsHeight = data.subtasks.slice(1).reduce((sum, opt, idx) => {
-      return sum + opt.length * 50 + 50; // Each method's subtasks height + gap
+      return sum + opt.length * optionSpacing + optionGap;
     }, 0);
     const lastOptionY = bestMatchBottomY + startingYOffset + totalOtherMethodsHeight;
     
@@ -714,7 +770,6 @@ useEffect(() => {
   
   // Handle selecting a method
   const handleSelectMethod = (index, selectNode, parentNode) => {
-    console.log('Method selected:', index);
     setSelectedMethodIndex(index);
     setIsEditMode(true);
     
@@ -736,8 +791,7 @@ useEffect(() => {
   
   // Handle creating a new method
   const handleCreateNewMethod = () => {
-    console.log('Create new method clicked');
-    const parentNode = nodes.find(n => n.id.includes(data.head.hash));
+    const parentNode = findTaskNodeByHash(nodes, data.head.hash);
     if (!parentNode) return;
     
     setSelectedMethodIndex(-1); // -1 indicates new method
@@ -753,8 +807,8 @@ useEffect(() => {
     const newNode = {
       id: newTaskId,
       position: {
-        x: parentNode.position.x + 400,
-        y: parentNode.position.y + data.subtasks.length * 100
+        x: getNextColumnX(parentNode.position.x),
+        y: parentNode.position.y + data.subtasks.length * LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING
       },
       data: {
         label: (
@@ -799,7 +853,7 @@ useEffect(() => {
         dropdown1: defaultTaskName,
         dropdown2: defaultArg
       },
-      style: { background: currentNodeColor, border: 'none' },
+      style: getEditableTaskNodeStyle(),
       sourcePosition: 'right',
       targetPosition: 'left',
     };
@@ -808,7 +862,7 @@ useEffect(() => {
     const confirmButtonNode = {
       id: `${newTaskId}-confirm`,
       position: {
-        x: newNode.position.x + 130,
+        x: newNode.position.x + EDITABLE_ACTION_CONFIRM_OFFSET_X,
         y: newNode.position.y + 30,
       },
       data: {
@@ -832,7 +886,7 @@ useEffect(() => {
     const trashButtonNode = {
       id: `${newTaskId}-trash`,
       position: {
-        x: newNode.position.x + 155,
+        x: newNode.position.x + EDITABLE_ACTION_TRASH_OFFSET_X,
         y: newNode.position.y + 30,
       },
       data: {
@@ -856,7 +910,7 @@ useEffect(() => {
     const addButtonNode = {
       id: `${newTaskId}-add`,
       position: {
-        x: newNode.position.x + 180,
+        x: newNode.position.x + EDITABLE_ACTION_ADD_OFFSET_X,
         y: newNode.position.y + 30,
       },
       data: {
@@ -899,25 +953,6 @@ useEffect(() => {
 
   // every confirsmation step has confirm, more options, add method and edit as options
   const handleConfirm = (yesNode, index, parentNode) => {
-    console.log('=== handleConfirm START ===');
-    console.log('yesNode:', yesNode);
-    console.log('index:', index);
-    console.log('parentNode:', parentNode);
-    console.log('Current nodes count:', nodesRef.current.length);
-    console.log('Current edges count:', edgesRef.current.length);
-    
-    // Monitor key nodes
-    const chatbotNode = nodesRef.current.find(n => n.id === 'chatbot-node');
-    const placeholderNode = nodesRef.current.find(n => n.id === 'chatbot-placeholder');
-    console.log('Chatbot node exists:', !!chatbotNode, chatbotNode?.position);
-    console.log('Placeholder node exists:', !!placeholderNode, placeholderNode?.position);
-    
-    // Monitor edges
-    const chatbotEdges = edgesRef.current.filter(e => e.source === 'chatbot-node' || e.target === 'chatbot-node');
-    const placeholderEdges = edgesRef.current.filter(e => e.source === 'chatbot-placeholder' || e.target === 'chatbot-placeholder');
-    console.log('Chatbot edges:', chatbotEdges.map(e => e.id));
-    console.log('Placeholder edges:', placeholderEdges.map(e => e.id));
-    
     // Check if any subtasks have been edited
     const hasEditedSubtasks = data.subtasks[0].some(task => {
       const taskNode = nodesRef.current.find(node => node.id === task.hash);
@@ -948,78 +983,54 @@ useEffect(() => {
     }
 
     // Original logic for no edits
-    console.log('=== SENDING SOCKET MESSAGE ===');
     
     // CRITICAL: Extract directTaskNodeIds BEFORE modifying edges
     // The edges are now chatbot → subtasks (not yesNode → subtasks)
     const currentEdges = edgesRef.current;
     const directTaskNodeIds = currentEdges
-      .filter(edge => edge.source === 'chatbot-node')
+      .filter(edge => edge.source === parentNode?.id)
       .map(edge => edge.target)
-      .filter(targetId => !targetId.endsWith('-edit')); // Filter out edit button nodes
-    
-    console.log('=== EXTRACTED directTaskNodeIds ===');
-    console.log('directTaskNodeIds:', directTaskNodeIds);
-    console.log('Looking for edges from chatbot-node');
-    console.log('All chatbot edges:', currentEdges.filter(e => e.source === 'chatbot-node').map(e => ({ id: e.id, target: e.target })));
+      .filter((targetId, index, targetIds) => {
+        if (targetIds.indexOf(targetId) !== index || isControlNodeId(targetId)) {
+          return false;
+        }
+
+        const targetNode = nodesRef.current.find(node => node.id === targetId);
+        return isTaskContentNode(targetNode);
+      });
+    const shiftedSubtreeNodeIds = collectShiftNodeIds(
+      directTaskNodeIds,
+      currentEdges,
+      nodesRef.current
+    );
     
     socket.emit("message", {type: 'response_decomposition_with_edit', 
                             response: {user_choice: 'approve', index: index}});
-    console.log("User confirmed decomposition");
 
-    const offsetY = index > 0 ? (index - 1) * 100 : 0;
+    const offsetY = index > 0
+      ? (index - 1) * (LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING + LAYOUT_CONSTANTS.SIBLING_CLEARANCE_Y)
+      : 0;
 
-    // Remove all chatbot edges - they will be replaced by placeholder edges
+    // Remove transient chatbot edges and any stale current-tree edges
     setEdges(prevEdges => {
-      console.log('=== REMOVING CHATBOT EDGES ===');
-      console.log('Edges before:', prevEdges.length);
-      const filtered = prevEdges.filter(edge =>
-        edge.source !== 'chatbot-node' &&
-        edge.target !== 'chatbot-node'
-      );
-      console.log('Edges after removing chatbot edges:', filtered.length);
+      const filtered = prevEdges.filter(edge => {
+        const isChatbotEdge =
+          edge.source === 'chatbot-node' ||
+          edge.target === 'chatbot-node';
+        const isOldCurrentTreeEdge =
+          directTaskNodeIds.includes(edge.target) &&
+          edge.source === parentNode.id;
+
+        return !isChatbotEdge && !isOldCurrentTreeEdge;
+      });
       return filtered;
     });
   
-    console.log('=== REPLACING CHATBOT WITH PLACEHOLDER ===');
-    setNodes(prevNodes => {
-      const chatbotNode = prevNodes.find(n => n.id === 'chatbot-node');
-      console.log('Found chatbot node:', chatbotNode);
-      console.log('Total nodes before replacement:', prevNodes.length);
-      console.log('Nodes with chatbot ID:', prevNodes.filter(n => n.id === 'chatbot-node').length);
-      console.log('Nodes with placeholder ID:', prevNodes.filter(n => n.id.startsWith('placeholder-')).length);
-      
-      const result = prevNodes
+    setNodes(prevNodes =>
+      prevNodes
+        .filter(node => node.id !== 'chatbot-node')
         .map(node => {
-          // Replace chatbot with placeholder at same position
-          if (node.id === 'chatbot-node') {
-            console.log('Replacing chatbot with placeholder at position:', node.position);
-            // Use parent node hash to create unique placeholder ID
-            const placeholderId = `placeholder-${parentNode.id}`;
-            return {
-              id: placeholderId,
-              position: node.position,
-              data: { label: '···', parentHash: parentNode.id },
-              style: {
-                background: 'rgb(236, 243, 254)',
-                border: 'none',
-                borderRadius: '8px',
-                width: '40px',
-                height: '32px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                fontSize: '16px',
-                color: '#666',
-                padding: '0',
-              },
-              sourcePosition: 'right',
-              targetPosition: 'left',
-            };
-          }
-          
-          // Adjust Y position for approved subtasks if needed
-          if (directTaskNodeIds.includes(node.id) && offsetY > 0) {
+          if (shiftedSubtreeNodeIds.has(node.id)) {
             return {
               ...node,
               position: {
@@ -1032,95 +1043,34 @@ useEffect(() => {
           return node;
         })
         .filter(node => {
-          // Remove edit buttons for approved subtasks
           if (node.id.endsWith('-edit')) {
             const taskId = node.id.replace('-edit', '');
             return !directTaskNodeIds.includes(taskId);
           }
           return true;
-        });
-      
-      console.log('Total nodes after replacement:', result.length);
-      console.log('Nodes with chatbot ID after:', result.filter(n => n.id === 'chatbot-node').length);
-      console.log('Nodes with placeholder ID after:', result.filter(n => n.id === 'chatbot-placeholder').length);
-      console.log('Placeholder node details:', result.find(n => n.id === 'chatbot-placeholder'));
-      
-      return result;
-    });
-    
-    // Re-create edges for placeholder immediately (no setTimeout needed)
-    // React batches state updates, so this will happen in the same render cycle as setNodes
-    console.log('=== CREATING PLACEHOLDER EDGES ===');
-    console.log('Parent node:', parentNode);
-    console.log('Direct task node IDs:', directTaskNodeIds);
+        })
+    );
     
     if (parentNode && directTaskNodeIds.length > 0) {
-      const placeholderId = `placeholder-${parentNode.id}`;
-      
       setEdges(prev => {
-        console.log('Current edges before adding placeholder edges:', prev.length);
-        console.log('Current edge IDs:', prev.map(e => e.id));
-        console.log('Placeholder ID:', placeholderId);
-        
         const existingEdgeIds = new Set(prev.map(e => e.id));
         const newEdges = [];
         
-        // Create parent → placeholder edge
-        const parentToPlaceholderEdgeId = `e-${parentNode.id}-${placeholderId}`;
-        if (!existingEdgeIds.has(parentToPlaceholderEdgeId)) {
-          newEdges.push({
-            id: parentToPlaceholderEdgeId,
-            source: parentNode.id,
-            target: placeholderId,
-            markerEnd: {
-              type: MarkerType.Arrow,
-              strokeWidth: 2,
-              color: currentEdgeColor,
-            },
-            style: {
-              strokeWidth: 2,
-              stroke: currentEdgeColor,
-            },
-          });
-        }
-        
-        // Create placeholder → subtasks edges
         directTaskNodeIds.forEach(targetId => {
-          const edgeId = `e-${placeholderId}-${targetId}`;
+          const edgeId = `e-${parentNode.id}-${targetId}`;
           if (!existingEdgeIds.has(edgeId)) {
-            newEdges.push({
-              id: edgeId,
-              source: placeholderId,
-              target: targetId,
-              markerEnd: {
-                type: MarkerType.Arrow,
-                strokeWidth: 2,
-                color: currentEdgeColor,
-              },
-              style: {
-                strokeWidth: 2,
-                stroke: currentEdgeColor,
-              },
-            });
+            newEdges.push(createTreeEdge(parentNode.id, targetId));
           }
         });
-        
-        console.log('Adding new edges:', newEdges.length);
-        console.log('New edge IDs:', newEdges.map(e => e.id));
         
         return [...prev, ...newEdges];
       });
     }
-  
-    console.log('=== SKIPPING updateNodesAndEdges (legacy More Options logic) ===');
-    // updateNodesAndEdges() is for the old "More Options" flow with unhide buttons
     // We no longer need it in the new approve/reject flow
     
     // Clear the message to hide this component
     // Backend will send display_added_method, which DisplayAddedMethod will handle
-    console.log('=== CALLING onConfirm to clear message ===');
     onConfirm();
-    console.log('=== handleConfirm END ===');
   };
 
   const handleUnhide = (yesNode) => {
@@ -1307,7 +1257,6 @@ useEffect(() => {
     const taskNode = nodesRef.current.find((node) => node.id === task.hash);
 
     if (!taskNode) {
-      console.warn(`Node with id ${task.hash} does not exist. Creating a new node.`);
       const newNode = {
         id: task.hash,
         position: { x: 0, y: 0 }, // Default position
@@ -1319,7 +1268,7 @@ useEffect(() => {
           dropdown1: task.task_name,
           dropdown2: task.args.length > 0 ? task.args[0] : ""
         },
-        style: { background: currentNodeColor, border: 'none' },
+        style: getTaskNodeStyle(currentNodeColor),
         sourcePosition: 'right',
         targetPosition: 'left',
       };
@@ -1387,7 +1336,7 @@ useEffect(() => {
     const trashButtonNode = {
       id: `${task.hash}-trash`,
       position: {
-        x: position.x + 155, // Position next to the edit button
+        x: position.x + TASK_ACTION_TRASH_OFFSET_X,
         y: position.y + 30, // Same vertical alignment as the edit button
       },
       data: {
@@ -1414,7 +1363,7 @@ useEffect(() => {
     const addButtonNode = {
       id: `${task.hash}-add`,
       position: {
-        x: position.x + 180,
+        x: position.x + TASK_ACTION_ADD_OFFSET_X,
         y: position.y + 30,
       },
       data: {
@@ -1521,7 +1470,7 @@ useEffect(() => {
         isEdited: true,
         isNew: true,
       },
-      style: { background: currentNodeColor, border: 'none' },
+      style: getEditableTaskNodeStyle(),
       sourcePosition: 'right',
       targetPosition: 'left',
     };
@@ -1558,7 +1507,7 @@ useEffect(() => {
     // Add a trash button for the new node
     const newTrashButtonNode = {
       id: `${newId}-trash`,
-      position: { x: baseX + 155, y: baseY + 30 },
+      position: { x: baseX + TASK_ACTION_TRASH_OFFSET_X, y: baseY + 30 },
       data: { label: '🗑', onClick: () => handleTrashClick(newId) },
       style: {
         background: 'none',
@@ -1586,12 +1535,10 @@ useEffect(() => {
 
   const handleNodeEditChange = (event, nodeId, dropdown) => {
     const newValue = event.target.value;
-    console.log(`Updating ${dropdown} for node ${nodeId} to:`, newValue);
   
     setNodes((prevNodes) => {
       const nodeExists = prevNodes.some((node) => node.id === nodeId);
       if (!nodeExists) {
-        console.warn(`Node with id ${nodeId} not found.`);
         return prevNodes;
       }
   
@@ -1624,7 +1571,6 @@ useEffect(() => {
       
       // Debug: log the updated node data
       const updatedNode = updatedNodes.find(node => node.id === nodeId);
-      console.log('Updated node data:', updatedNode?.data);
       
       return updatedNodes;
     });
@@ -1751,3 +1697,4 @@ useEffect(() => {
 }
 
 export default ConfirmBestMatchDecomposition;
+

@@ -6,7 +6,6 @@ import valPic from './assets/val_pic.jpg';
 function Chatbot({ socket, message }) {
   const emitMessage = (payload) => {
     try {
-      console.log('[chatbot] emitting ->', payload);
       socket?.emit?.('message', payload);
     } catch (e) {
       console.error('[chatbot] emit failed:', e, 'payload:', payload);
@@ -14,13 +13,11 @@ function Chatbot({ socket, message }) {
   };
 
   useEffect(() => {
-    console.log('Chatbot component mounted!');
 
     const msgerForm = document.getElementsByClassName("msger-inputarea")[0];
     const msgerInput = document.getElementsByClassName("msger-input")[0];
 
     if (!socket) {
-      console.warn("socket.io not found. Make sure you loaded it or installed it properly");
       return;
     }
 
@@ -48,7 +45,6 @@ function Chatbot({ socket, message }) {
     }
 
     return () => {
-      console.log("Chatbot component unmounted!");
       if (msgerForm) {
         msgerForm.removeEventListener('submit', () => {});
       }
@@ -57,8 +53,6 @@ function Chatbot({ socket, message }) {
 
   useEffect(() => {
     if (message) {
-      console.log('Chatbot received new message =>', message);
-      console.log('Message type:', message['type']);
 
       if (
         message['type'] === 'display_known_tasks' ||
@@ -79,24 +73,16 @@ function Chatbot({ socket, message }) {
         correctGrounding(message);
       }
       else if (message['type'] === 'display_thinking_analysis') {
-        console.log('About to call displayThinkingAnalysis');
         displayThinkingAnalysis(message);
-        console.log('displayThinkingAnalysis called');
       }
       else if (message['type'] === 'show_thinking_analysis_and_decomposition') {
-        console.log('About to call showThinkingAnalysisAndDecomposition');
         showThinkingAnalysisAndDecomposition(message);
-        console.log('showThinkingAnalysisAndDecomposition called');
       }
       else if (message['type'] === 'confirm_best_match_decomposition') {
-        console.log('About to call displayDecompositionConfirmationFromTree');
         displayDecompositionConfirmationFromTree(message);
-        console.log('displayDecompositionConfirmationFromTree called');
       }
       else if (message['type'] === 'display_decomposition_analysis') {
-        console.log('About to call displayDecompositionAnalysis');
         displayDecompositionAnalysis(message);
-        console.log('displayDecompositionAnalysis called');
       }
     }
   }, [message]);
@@ -136,9 +122,6 @@ function Chatbot({ socket, message }) {
   }
 
   function buildDialog(data) {
-    console.log('=== buildDialog CALLED ===');
-    console.log('Message type:', data['type']);
-    console.log('Message text:', data['text']);
     
     let displayText = data['text'];
     
@@ -151,9 +134,7 @@ function Chatbot({ socket, message }) {
       displayText = formatEditOptionsText(data['text']);
     }
     
-    console.log('About to append message with text:', displayText);
     appendMessage("VAL", valPic, "left", displayText);
-    console.log('Message appended successfully');
   }
 
   function formatAnalysisTextSimple(text) {
@@ -180,14 +161,12 @@ function Chatbot({ socket, message }) {
   }
 
   function displayThinkingAnalysis(message) {
-    console.log('displayThinkingAnalysis called with message:', message);
     const data = message.text;
     const userTask = data.user_task;
     const taskName = data.task_name;
     const taskArgs = data.task_args;
     const analysisText = data.analysis_text;
     
-    console.log('Thinking analysis data:', { userTask, taskName, taskArgs, analysisText });
     
     // Format the analysis text
     const formattedText = formatAnalysisTextSimple(analysisText);
@@ -202,7 +181,6 @@ function Chatbot({ socket, message }) {
     approveButton.innerHTML = '✓ Approve';
     approveButton.style.marginRight = '10px';
     approveButton.onclick = () => {
-      console.log('Grounding approve button clicked, sending response...');
       socket.emit('message', {
         type: 'confirm_response',
         response: 'yes'
@@ -216,7 +194,6 @@ function Chatbot({ socket, message }) {
     rejectButton.className = 'no';
     rejectButton.innerHTML = '× Reject';
     rejectButton.onclick = () => {
-      console.log('Grounding reject button clicked, sending response...');
       socket.emit('message', {
         type: 'confirm_response',
         response: 'no'
@@ -234,8 +211,6 @@ function Chatbot({ socket, message }) {
   }
 
   function showThinkingAnalysisAndDecomposition(message) {
-    console.log('=== showThinkingAnalysisAndDecomposition CALLED ===');
-    console.log('showThinkingAnalysisAndDecomposition called with message:', message);
     
     try {
       const data = message.text;
@@ -244,16 +219,13 @@ function Chatbot({ socket, message }) {
       const taskArgs = data.task_args;
       const analysisText = data.analysis_text;
       
-      console.log('Thinking analysis and decomposition data:', { userTask, taskName, taskArgs, analysisText });
       
       // Format the analysis text (use the one from backend if available)
-      console.log('About to format text...');
       const formattedText = formatAnalysisTextSimple(analysisText || `Thinking...
 
 Based on your input "${userTask}", I understood this as the action: ${taskName}(${taskArgs ? taskArgs.join(', ') : ''}).
 
 Is it correct?`);
-      console.log('Text formatted successfully');
     
     // Create approve/reject buttons for grounding confirmation
     const buttonsDiv = document.createElement('div');
@@ -265,10 +237,6 @@ Is it correct?`);
     approveButton.innerHTML = '✓ Approve';
     approveButton.style.marginRight = '10px';
     approveButton.onclick = () => {
-      console.log('===========================================');
-      console.log('=== CHATBOT APPROVE BUTTON CLICKED!!! ===');
-      console.log('===========================================');
-      console.log('Triggering chatbot_decomposition_action event...');
       console.trace('Button click stack trace');
 
       emitMessage({
@@ -282,7 +250,6 @@ Is it correct?`);
         detail: { action: 'approve', index: 0 }
       });
       window.dispatchEvent(event);
-      console.log('Event dispatched:', event);
       
       // Disable and fade out buttons after clicking
       approveButton.disabled = true;
@@ -291,14 +258,12 @@ Is it correct?`);
       rejectButton.style.opacity = '0.3';
       approveButton.style.cursor = 'not-allowed';
       rejectButton.style.cursor = 'not-allowed';
-      console.log('Buttons disabled and faded');
     };
 
     const rejectButton = document.createElement('button');
     rejectButton.className = 'no';
     rejectButton.innerHTML = '× Reject';
     rejectButton.onclick = () => {
-      console.log('Decomposition reject button clicked');
       // Disable and fade out the approve/reject buttons
       approveButton.disabled = true;
       rejectButton.disabled = true;
@@ -317,19 +282,12 @@ Is it correct?`);
     buttonsDiv.appendChild(approveButton);
     buttonsDiv.appendChild(rejectButton);
     
-    console.log('=== BUTTONS CREATED ===');
-    console.log('Approve button:', approveButton);
-    console.log('Reject button:', rejectButton);
-    console.log('Buttons div:', buttonsDiv);
     
       // Display the thinking analysis with buttons
-      console.log('About to append message...');
       appendMessage("VAL", valPic, "left", formattedText, buttonsDiv);
-      console.log('=== MESSAGE APPENDED ===');
       
       // Also trigger decomposition tree display (this should be handled by the backend)
       // For now, we'll emit a message to show the decomposition tree
-      console.log('Triggering decomposition tree display...');
     } catch (error) {
       console.error('Error in showThinkingAnalysisAndDecomposition:', error);
       console.error('Error stack:', error.stack);
@@ -337,14 +295,12 @@ Is it correct?`);
   }
 
   function displayDecompositionAnalysis(message) {
-    console.log('displayDecompositionAnalysis called with message:', message);
     const data = message.text;
     const taskName = data.task_name;
     const analysisText = data.analysis_text;
     const subtaskNames = data.subtask_names;
     const preconditionNames = data.precondition_names;
     
-    console.log('Analysis data:', { taskName, analysisText, subtaskNames, preconditionNames });
     
     // Format the analysis text
     const formattedText = formatAnalysisText(analysisText);
@@ -360,7 +316,6 @@ Is it correct?`);
     approveButton.innerHTML = '✓ Approve';
     approveButton.style.marginRight = '10px';
     approveButton.onclick = () => {
-      console.log('Decomposition approve button clicked, sending response...');
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
         response: { user_choice: 'approve', index: 0 }
@@ -377,7 +332,6 @@ Is it correct?`);
     rejectButton.className = 'no';
     rejectButton.innerHTML = '× Reject';
     rejectButton.onclick = () => {
-      console.log('Decomposition reject button clicked, showing more options...');
       // Show more options (equivalent to handleRejectClick logic)
       showMoreOptionsButtons(buttonsDiv, approveButton, rejectButton);
     };
@@ -395,7 +349,6 @@ Is it correct?`);
     moreOptionsButton.style.padding = '8px 16px';
     moreOptionsButton.style.cursor = 'pointer';
     moreOptionsButton.onclick = () => {
-      console.log('More options button clicked - placeholder');
       // TODO: Implement handleMoreOptionsClick logic
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
@@ -415,7 +368,6 @@ Is it correct?`);
     addMethodButton.style.padding = '8px 16px';
     addMethodButton.style.cursor = 'pointer';
     addMethodButton.onclick = () => {
-      console.log('Add method button clicked - placeholder');
       // TODO: Implement handleAddMethod logic
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
@@ -436,7 +388,6 @@ Is it correct?`);
     editButton.style.padding = '8px 16px';
     editButton.style.cursor = 'pointer';
     editButton.onclick = () => {
-      console.log('Edit button clicked - placeholder');
       // TODO: Implement handleEditClick logic
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
@@ -451,7 +402,6 @@ Is it correct?`);
     confirmEditButton.style.marginRight = '10px';
     confirmEditButton.style.display = 'none'; // Initially hidden
     confirmEditButton.onclick = () => {
-      console.log('Confirm edit button clicked - placeholder');
       // TODO: Implement handleConfirmEdit logic
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
@@ -466,7 +416,6 @@ Is it correct?`);
     trashButton.style.marginRight = '10px';
     trashButton.style.display = 'none'; // Initially hidden
     trashButton.onclick = () => {
-      console.log('Trash button clicked - placeholder');
       // TODO: Implement handleTrashClick logic
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
@@ -480,7 +429,6 @@ Is it correct?`);
     addNodeButton.innerHTML = '+ Add Node';
     addNodeButton.style.display = 'none'; // Initially hidden
     addNodeButton.onclick = () => {
-      console.log('Add node button clicked - placeholder');
       // TODO: Implement handleAddNode logic
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
@@ -533,7 +481,6 @@ Is it correct?`);
   }
 
   function displayDecompositionAnalysisFromTree(message) {
-    console.log('displayDecompositionAnalysisFromTree called with message:', message);
     const treeData = message.text;
     const taskName = treeData.head.name;
     const subtasks = treeData.subtasks[0] || [];
@@ -550,7 +497,6 @@ Is it correct?`);
 **Preconditions:** None specified
 `;
     
-    console.log('Analysis data:', { taskName, analysisText, subtaskNames });
     
     // Format the analysis text
     const formattedText = formatAnalysisText(analysisText);
@@ -565,7 +511,6 @@ Is it correct?`);
     approveButton.innerHTML = '✓ Approve';
     approveButton.style.marginRight = '10px';
     approveButton.onclick = () => {
-      console.log('Approve button clicked, sending response...');
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
         response: { user_choice: 'approve', index: 0 }
@@ -576,7 +521,6 @@ Is it correct?`);
     rejectButton.className = 'no';
     rejectButton.innerHTML = '× Reject';
     rejectButton.onclick = () => {
-      console.log('Reject button clicked, sending response...');
       socket.emit('message', {
         type: 'response_decomposition_with_edit',
         response: { user_choice: 'reject', index: 0 }
@@ -591,10 +535,8 @@ Is it correct?`);
   }
 
   function displayDecompositionConfirmationFromTree(message) {
-    console.log('displayDecompositionConfirmationFromTree called with message:', message);
     const container = document.getElementById('prompt-message');
     if (container && container.children.length > 0) {
-      console.log('Skipping fallback confirmation message because the chatbot already has content');
       return;
     }
     const treeData = message.text;
