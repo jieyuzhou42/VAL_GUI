@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { ReactFlow, Handle, Position, useReactFlow } from '@xyflow/react';
+import React, { useState } from 'react';
+import { ReactFlow, Handle, Position } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import Chatbot from './chatbot';
 
 const CHATBOT_WIDTH = 340;
-const MIN_CHATBOT_SCALE = 0.72;
-const MAX_CHATBOT_SCALE = 1.02;
 
 const nodeTypes = {
   chatbot: () => (
@@ -33,22 +31,6 @@ const nodeTypes = {
   )
 };
 
-function AutoFitView({ nodes }) {
-  const { fitView } = useReactFlow();
-
-  useEffect(() => {
-    const nodesToFit = nodes.filter(node => node.id !== 'chatbot-node');
-    if (nodesToFit.length === 0) return;
-
-    const frame = requestAnimationFrame(() => {
-      fitView({ padding: 0.08, duration: 250, nodes: nodesToFit });
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [nodes, fitView]);
-
-  return null;
-}
 
 function ChatbotOverlay({ nodes, viewport }) {
   const chatbotNode = nodes.find(node => node.id === 'chatbot-node');
@@ -60,7 +42,7 @@ function ChatbotOverlay({ nodes, viewport }) {
   const { socket, message } = chatbotNode.data ?? {};
   const left = viewport.x + chatbotNode.position.x * viewport.zoom;
   const top = viewport.y + chatbotNode.position.y * viewport.zoom;
-  const chatbotScale = Math.min(MAX_CHATBOT_SCALE, Math.max(MIN_CHATBOT_SCALE, viewport.zoom));
+  const chatbotScale = viewport.zoom;
 
   return (
     <div
@@ -99,9 +81,7 @@ function Display({ nodes, edges }) {
             node.data.onClick();
           }
         }}
-      >
-        <AutoFitView nodes={nodes} />
-      </ReactFlow>
+      />
       <ChatbotOverlay nodes={nodes} viewport={viewport} />
     </div>
   );

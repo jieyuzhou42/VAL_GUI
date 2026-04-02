@@ -15,7 +15,7 @@ const POSITION_CONSTANTS = {
   PARENT_TO_CHATBOT_OFFSET_Y: 0,
   CHATBOT_NODE_OFFSET_X: 150,
   CHATBOT_NODE_OFFSET_Y: -200,
-  CHATBOT_VISIBLE_SHIFT_X: 400,
+  CHATBOT_VISIBLE_SHIFT_X: 250,
 };
 
 const findTaskNodeByHash = (nodes, taskHash) => nodes.find(node => node.id === taskHash);
@@ -29,9 +29,8 @@ function App () {
   const [edges, setEdges] = useState([]);
   const [chatbotPosition, setChatbotPosition] = useState({ x: 50, y: 50 });
   const nodesRef = useRef([]);
-  const positionedHeadHashRef = useRef(null);
-  const shiftedHeadHashesRef = useRef(new Set());
-  const movedNodesRef = useRef(new Map());
+  const shiftedHeadHashRef = useRef(null);
+  const shiftedNodeOriginalXRef = useRef(new Map());
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -49,7 +48,6 @@ function App () {
         setChatbotPosition(prev =>
           prev.x === nextPosition.x && prev.y === nextPosition.y ? prev : nextPosition
         );
-        positionedHeadHashRef.current = headHash;
       }
     }
   }, [message, nodes]);
@@ -65,41 +63,29 @@ function App () {
   }, []);
 
   useEffect(() => {
-    if (showChatbot) {
-      const headHash =
-        message?.type === 'confirm_best_match_decomposition' ? message?.text?.head?.hash : null;
-      const shouldShiftRight =
-        !!headHash &&
-        positionedHeadHashRef.current === headHash &&
-        !shiftedHeadHashesRef.current.has(headHash);
+    const nextHeadHash =
+      showChatbot && message?.type === 'confirm_best_match_decomposition'
+        ? message?.text?.head?.hash
+        : null;
 
-      if (shouldShiftRight) {
-        shiftedHeadHashesRef.current.add(headHash);
+    setNodes(prevNodes => {
+      let changed = false;
+      let nextNodes = prevNodes;
+      let activeHeadHash = shiftedHeadHashRef.current;
+      let shiftedNodeOriginalX = shiftedNodeOriginalXRef.current;
 
-        setNodes(prevNodes =>
-          prevNodes.map(node => {
-            if (node.position.x > chatbotPosition.x - 50 && node.id !== 'chatbot-node') {
-              if (!movedNodesRef.current.has(node.id)) {
-                movedNodesRef.current.set(node.id, node.position.x);
-              }
-
-              return {
-                ...node,
-                position: {
-                  ...node.position,
-                  x: node.position.x + POSITION_CONSTANTS.CHATBOT_VISIBLE_SHIFT_X,
-                },
-              };
-            }
-
+      if (activeHeadHash && activeHeadHash !== nextHeadHash && shiftedNodeOriginalX.size > 0) {
+        nextNodes = nextNodes.map(node => {
+          if (!shiftedNodeOriginalX.has(node.id)) {
             return node;
-          })
-        );
-      }
-    } else {
-      const restoredNodes = nodes.map(node => {
-        if (movedNodesRef.current.has(node.id)) {
-          const originalX = movedNodesRef.current.get(node.id);
+          }
+
+          const originalX = shiftedNodeOriginalX.get(node.id);
+          if (node.position.x === originalX) {
+            return node;
+          }
+
+          changed = true;
           return {
             ...node,
             position: {
@@ -107,18 +93,55 @@ function App () {
               x: originalX,
             },
           };
+        });
+
+        shiftedNodeOriginalX = new Map();
+        activeHeadHash = null;
+      }
+
+      if (showChatbot && nextHeadHash) {
+        const targetNode = findTaskNodeByHash(nextNodes, nextHeadHash);
+        if (!targetNode) {
+          shiftedHeadHashRef.current = activeHeadHash;
+          shiftedNodeOriginalXRef.current = shiftedNodeOriginalX;
+          return changed ? nextNodes : prevNodes;
         }
 
-        return node;
-      });
+        const shiftThresholdX = targetNode.position.x;
+        const nextShiftedNodeOriginalX =
+          activeHeadHash === nextHeadHash ? new Map(shiftedNodeOriginalX) : new Map();
 
-      setNodes(restoredNodes);
+        nextNodes = nextNodes.map(node => {
+          if (node.id === 'chatbot-node' || node.position.x <= shiftThresholdX) {
+            return node;
+          }
 
-      setTimeout(() => {
-        movedNodesRef.current.clear();
-      }, 0);
-    }
-  }, [showChatbot, chatbotPosition, message]);
+          if (nextShiftedNodeOriginalX.has(node.id)) {
+            return node;
+          }
+
+          nextShiftedNodeOriginalX.set(node.id, node.position.x);
+          changed = true;
+
+          return {
+            ...node,
+            position: {
+              ...node.position,
+              x: node.position.x + POSITION_CONSTANTS.CHATBOT_VISIBLE_SHIFT_X,
+            },
+          };
+        });
+
+        shiftedHeadHashRef.current = nextShiftedNodeOriginalX.size > 0 ? nextHeadHash : null;
+        shiftedNodeOriginalXRef.current = nextShiftedNodeOriginalX;
+      } else {
+        shiftedHeadHashRef.current = activeHeadHash;
+        shiftedNodeOriginalXRef.current = shiftedNodeOriginalX;
+      }
+
+      return changed ? nextNodes : prevNodes;
+    });
+  }, [showChatbot, message, nodes]);
 
   useEffect(() => {
     if (!message) return;
@@ -144,9 +167,8 @@ function App () {
       setShowChatbot(false);
       setNodes([]);
       setEdges([]);
-      movedNodesRef.current.clear();
-      shiftedHeadHashesRef.current.clear();
-      positionedHeadHashRef.current = null;
+      shiftedHeadHashRef.current = null;
+      shiftedNodeOriginalXRef.current = new Map();
     }
   }, [message]);
 

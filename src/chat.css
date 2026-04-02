@@ -42,8 +42,8 @@
 /* panel: 동일 카드톤 + 원래 사이즈 */
 .chatbot-container .msger{
   display:flex; flex-flow:column nowrap; justify-content:space-between;
-  width:clamp(280px, 22vw, 340px);
-  height:clamp(360px, 50vh, 500px);
+  width:340px;
+  height:500px;
   margin:6px;
   border-radius:12px;
   background:var(--panel-bg);
