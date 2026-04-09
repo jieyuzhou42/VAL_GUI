@@ -107,6 +107,7 @@ function Chatbot({ socket, message }) {
     container.scrollTop += 500;
 
     const lastMsgBubble = container.lastElementChild.querySelector(".msg-bubble");
+    const msgTextElement = container.lastElementChild.querySelector(".msg-text");
 
     if (buttons) {
       lastMsgBubble.appendChild(buttons);
@@ -119,6 +120,8 @@ function Chatbot({ socket, message }) {
     if (socket) {
       socket.emit('on log', msgHTML);
     }
+
+    return { lastMsgBubble, msgTextElement };
   }
 
   function buildDialog(data) {
@@ -142,6 +145,174 @@ function Chatbot({ socket, message }) {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\n/g, '<br>');
+  }
+
+  function formatAnalysisText(text) {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`(.*?)`/g, '<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px;">$1</code>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+  }
+
+  function mountDecompositionChoicePrompt({
+    taskName,
+    initialText,
+    decompositionMethods = [],
+  }) {
+    let currentDecompositionMethods = decompositionMethods;
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.className = 'chatbot-container buttons';
+    buttonsDiv.style.marginTop = '10px';
+
+    const appended = appendMessage(
+      "VAL",
+      valPic,
+      "left",
+      formatAnalysisTextSimple(initialText),
+      buttonsDiv
+    );
+
+    const msgTextElement = appended?.msgTextElement;
+
+    const setMessageText = (text) => {
+      if (msgTextElement) {
+        msgTextElement.innerHTML = formatAnalysisTextSimple(text);
+      }
+    };
+
+    const setButtonDisabled = (button, disabled = true) => {
+      if (!button) return;
+      button.disabled = disabled;
+      button.style.opacity = disabled ? '0.3' : '1';
+      button.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    };
+
+    const styleOptionButton = (button) => {
+      button.style.backgroundColor = '#95B9F3';
+      button.style.color = 'white';
+      button.style.border = 'none';
+      button.style.borderRadius = '16px';
+      button.style.padding = '8px 16px';
+    };
+
+    const createActionButton = (label, className, onClick) => {
+      const button = document.createElement('button');
+      button.className = className;
+      button.innerHTML = label;
+      button.style.marginRight = '10px';
+      button.onclick = onClick;
+      return button;
+    };
+
+    const syncMethodsFromEvent = (event) => {
+      const detail = event?.detail || {};
+      const nextTaskName = detail.taskName;
+      const nextMethods = detail.decompositionMethods;
+
+      if (nextTaskName && nextTaskName !== taskName) {
+        return;
+      }
+
+      if (Array.isArray(nextMethods) && nextMethods.length > 0) {
+        currentDecompositionMethods = nextMethods;
+      }
+    };
+
+    window.addEventListener('chatbot_set_decomposition_methods', syncMethodsFromEvent);
+
+    const getMethodText = (methodIndex, isAlternative = false) => {
+      const subtasks = currentDecompositionMethods?.[methodIndex] || [];
+      if (subtasks.length === 0) {
+        return isAlternative
+          ? `I can try another decomposition for ${taskName}.\n\nIs it correct?`
+          : initialText;
+      }
+
+      const subtaskNames = subtasks.map(task => {
+        const args = Array.isArray(task.args) ? task.args.filter(Boolean) : [];
+        return args.length > 0
+          ? `${task.task_name}(${args.join(', ')})`
+          : task.task_name;
+      });
+
+      if (isAlternative) {
+        return `I can also try another decomposition for ${taskName}:\n\n${subtaskNames.join(', ')}.\n\nIs this one correct?`;
+      }
+
+      return `Thinking...\n\nBased on my knowledge and the condition, I will decompose ${taskName} to ${subtaskNames.join(', ')}.\n\nIs it correct?`;
+    };
+
+    const renderApproveReject = (methodIndex, isAlternative = false) => {
+      setMessageText(
+        methodIndex === 0 && !isAlternative
+          ? initialText
+          : getMethodText(methodIndex, isAlternative)
+      );
+
+      buttonsDiv.innerHTML = '';
+
+      const approveButton = createActionButton('✓ Approve', 'yes', () => {
+        window.dispatchEvent(new CustomEvent('chatbot_decomposition_action', {
+          detail: { action: 'approve', index: methodIndex }
+        }));
+        setButtonDisabled(approveButton);
+        setButtonDisabled(rejectButton);
+      });
+
+      const rejectButton = createActionButton('× Reject', 'no', () => {
+        renderRejectOptions(methodIndex, approveButton);
+      });
+
+      buttonsDiv.appendChild(approveButton);
+      buttonsDiv.appendChild(rejectButton);
+    };
+
+    const renderRejectOptions = (methodIndex, approveButton) => {
+      buttonsDiv.innerHTML = '';
+      buttonsDiv.appendChild(approveButton);
+
+      const optionContainer = document.createElement('div');
+      optionContainer.style.display = 'inline-flex';
+      optionContainer.style.flexDirection = 'column';
+      optionContainer.style.gap = '8px';
+      optionContainer.style.verticalAlign = 'top';
+
+      const addMethodButton = createActionButton('+ Add Method', 'more-options', () => {
+        setButtonDisabled(addMethodButton);
+        setButtonDisabled(moreOptionsButton);
+        window.dispatchEvent(new CustomEvent('chatbot_add_method', {
+          detail: { action: 'add_method', index: methodIndex }
+        }));
+      });
+      addMethodButton.style.marginRight = '0';
+      styleOptionButton(addMethodButton);
+
+      const hasNextMethod = methodIndex + 1 < currentDecompositionMethods.length;
+      const moreOptionsButton = createActionButton('More Options', 'more-options', () => {
+        if (!hasNextMethod) {
+          return;
+        }
+
+        const nextMethodIndex = methodIndex + 1;
+        window.dispatchEvent(new CustomEvent('chatbot_preview_method', {
+          detail: { index: nextMethodIndex }
+        }));
+        renderApproveReject(nextMethodIndex, true);
+      });
+      moreOptionsButton.style.marginRight = '0';
+      styleOptionButton(moreOptionsButton);
+
+      if (!hasNextMethod) {
+        setButtonDisabled(moreOptionsButton);
+      }
+
+      optionContainer.appendChild(addMethodButton);
+      optionContainer.appendChild(moreOptionsButton);
+      buttonsDiv.appendChild(optionContainer);
+    };
+
+    renderApproveReject(0, false);
   }
 
   function formatMethodCreationText(text) {
@@ -220,12 +391,18 @@ function Chatbot({ socket, message }) {
       const analysisText = data.analysis_text;
       
       
-      // Format the analysis text (use the one from backend if available)
-      const formattedText = formatAnalysisTextSimple(analysisText || `Thinking...
+      const promptText = analysisText || `Thinking...
 
 Based on your input "${userTask}", I understood this as the action: ${taskName}(${taskArgs ? taskArgs.join(', ') : ''}).
 
-Is it correct?`);
+Is it correct?`;
+
+      mountDecompositionChoicePrompt({
+        taskName,
+        initialText: promptText,
+        decompositionMethods: data.subtasks || [],
+      });
+      return;
     
     // Create approve/reject buttons for grounding confirmation
     const buttonsDiv = document.createElement('div');
@@ -536,21 +713,139 @@ Is it correct?`);
 
   function displayDecompositionConfirmationFromTree(message) {
     const container = document.getElementById('prompt-message');
+    const treeData = message.text;
+    const taskName = treeData?.head?.name || 'task';
+    const decompositionMethods = treeData?.subtasks || [];
+
+    window.dispatchEvent(new CustomEvent('chatbot_set_decomposition_methods', {
+      detail: {
+        taskName,
+        decompositionMethods,
+      }
+    }));
+
     if (container && container.children.length > 0) {
       return;
     }
-    const treeData = message.text;
-    const taskName = treeData?.head?.name || 'task';
-    const taskArg = treeData?.head?.V || '';
-    const subtasks = treeData?.subtasks?.[0] || [];
-    const subtaskNames = subtasks.map(task => `${task.task_name}(${(task.args || []).join(', ')})`);
-    const analysisText = `Thinking...
+    
+
+    const setButtonDisabled = (button, disabled = true) => {
+      if (!button) return;
+      button.disabled = disabled;
+      button.style.opacity = disabled ? '0.3' : '1';
+      button.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    };
+
+    const createActionButton = (label, className, onClick) => {
+      const button = document.createElement('button');
+      button.className = className;
+      button.innerHTML = label;
+      button.style.marginRight = '10px';
+      button.onclick = onClick;
+      return button;
+    };
+
+    const getMethodText = (methodIndex, isAlternative = false) => {
+      const subtasks = decompositionMethods?.[methodIndex] || [];
+      const subtaskNames = subtasks.map(task => {
+        const args = Array.isArray(task.args) ? task.args.filter(Boolean) : [];
+        return args.length > 0
+          ? `${task.task_name}(${args.join(', ')})`
+          : task.task_name;
+      });
+
+      if (isAlternative) {
+        return `I can also try another decomposition for ${taskName}:
+
+${subtaskNames.join(', ')}.
+
+Is this one correct?`;
+      }
+
+      return `Thinking...
 
 Based on my knowledge and the condition, I will decompose ${taskName} to ${subtaskNames.join(', ')}.
 
 Is it correct?`;
+    };
 
-    const formattedText = formatAnalysisTextSimple(analysisText);
+    const showRejectOptions = (methodIndex, buttonsDiv) => {
+      buttonsDiv.innerHTML = '';
+
+      const addMethodButton = createActionButton('+ Add Method', 'more-options', () => {
+        setButtonDisabled(addMethodButton);
+        setButtonDisabled(moreOptionsButton);
+        window.dispatchEvent(new CustomEvent('chatbot_add_method', {
+          detail: { action: 'add_method', index: methodIndex }
+        }));
+      });
+      addMethodButton.style.backgroundColor = '#95B9F3';
+      addMethodButton.style.color = 'white';
+      addMethodButton.style.border = 'none';
+      addMethodButton.style.borderRadius = '16px';
+      addMethodButton.style.padding = '8px 16px';
+
+      const hasNextMethod = methodIndex + 1 < decompositionMethods.length;
+      const moreOptionsButton = createActionButton('More Options', 'more-options', () => {
+        if (!hasNextMethod) {
+          return;
+        }
+
+        const nextMethodIndex = methodIndex + 1;
+        setButtonDisabled(addMethodButton);
+        setButtonDisabled(moreOptionsButton);
+        window.dispatchEvent(new CustomEvent('chatbot_preview_method', {
+          detail: { index: nextMethodIndex }
+        }));
+        renderMethodPrompt(nextMethodIndex, true);
+      });
+      moreOptionsButton.style.backgroundColor = '#95B9F3';
+      moreOptionsButton.style.color = 'white';
+      moreOptionsButton.style.border = 'none';
+      moreOptionsButton.style.borderRadius = '16px';
+      moreOptionsButton.style.padding = '8px 16px';
+
+      if (!hasNextMethod) {
+        moreOptionsButton.disabled = true;
+        moreOptionsButton.style.opacity = '0.3';
+        moreOptionsButton.style.cursor = 'not-allowed';
+      }
+
+      buttonsDiv.appendChild(addMethodButton);
+      buttonsDiv.appendChild(moreOptionsButton);
+    };
+
+    const renderMethodPrompt = (methodIndex, isAlternative = false) => {
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'chatbot-container buttons';
+      buttonsDiv.style.marginTop = '10px';
+
+      const approveButton = createActionButton('✓ Approve', 'yes', () => {
+        window.dispatchEvent(new CustomEvent('chatbot_decomposition_action', {
+          detail: { action: 'approve', index: methodIndex }
+        }));
+        setButtonDisabled(approveButton);
+        setButtonDisabled(rejectButton);
+      });
+
+      const rejectButton = createActionButton('× Reject', 'no', () => {
+        showRejectOptions(methodIndex, buttonsDiv);
+      });
+
+      buttonsDiv.appendChild(approveButton);
+      buttonsDiv.appendChild(rejectButton);
+
+      appendMessage(
+        "VAL",
+        valPic,
+        "left",
+        formatAnalysisTextSimple(getMethodText(methodIndex, isAlternative)),
+        buttonsDiv
+      );
+    };
+
+    renderMethodPrompt(0, false);
+    return;
 
     const buttonsDiv = document.createElement('div');
     buttonsDiv.className = 'chatbot-container buttons';

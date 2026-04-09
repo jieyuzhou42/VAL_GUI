@@ -197,6 +197,121 @@ useEffect(() => {
   nodesRef.current = nodes;
 }, [nodes]);
 
+  const buildMethodPreviewElements = (parentNode, methodIndex) => {
+    const tasks = data.subtasks?.[methodIndex] || [];
+    const childColumnX = getNextColumnX(parentNode.position.x);
+    const newNodes = [];
+    const newEdges = [];
+
+    tasks.forEach((task, subIndex) => {
+      const taskNodeId = task.hash;
+      const taskNode = {
+        id: taskNodeId,
+        position: {
+          x: childColumnX,
+          y: getChildY(parentNode.position.y, subIndex, tasks.length)
+        },
+        data: {
+          label: `${task.task_name} ${task.args}`,
+          task_name: task.task_name,
+          args: task.args,
+          hash: task.hash
+        },
+        _style: getTaskNodeStyle(currentNodeColor),
+        get style() {
+          return this._style;
+        },
+        set style(value) {
+          this._style = value;
+        },
+        sourcePosition: 'right',
+        targetPosition: 'left',
+      };
+
+      const editButtonNode = {
+        id: `${taskNodeId}-edit`,
+        position: {
+          x: taskNode.position.x + TASK_ACTION_OFFSET_X,
+          y: taskNode.position.y,
+        },
+        data: {
+          label: '✎',
+          onClick: () => handleEditClick(task),
+        },
+        style: {
+          background: 'none',
+          width: '20px',
+          height: '20px',
+          borderRadius: 'none',
+          border: '1px solid black',
+          fontSize: '10px',
+          textAlign: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+      };
+
+      newNodes.push(taskNode, editButtonNode);
+      newEdges.push(createTreeEdge(parentNode.id, taskNode.id));
+    });
+
+    return { newNodes, newEdges };
+  };
+
+  const replacePreviewMethod = (methodIndex) => {
+    const parentNode = findTaskNodeByHash(nodesRef.current, data.head.hash);
+    if (!parentNode) {
+      return;
+    }
+
+    const directTaskNodeIds = edgesRef.current
+      .filter(edge => edge.source === parentNode.id)
+      .map(edge => edge.target)
+      .filter(targetId => {
+        const targetNode = nodesRef.current.find(node => node.id === targetId);
+        return isTaskContentNode(targetNode);
+      });
+
+    const removableNodeIds = collectShiftNodeIds(
+      directTaskNodeIds,
+      edgesRef.current,
+      nodesRef.current
+    );
+
+    nodesRef.current.forEach(node => {
+      if (
+        node.id === 'create-new-method' ||
+        node.id === 'noNode' ||
+        node.id === 'add method' ||
+        node.id === 'reject' ||
+        node.id.startsWith(`${data.head.hash}-select-`)
+      ) {
+        removableNodeIds.add(node.id);
+      }
+    });
+
+    const { newNodes, newEdges } = buildMethodPreviewElements(parentNode, methodIndex);
+
+    setNodes(prevNodes => [
+      ...prevNodes.filter(node => !removableNodeIds.has(node.id)),
+      ...newNodes
+    ]);
+
+    setEdges(prevEdges => {
+      const filteredEdges = prevEdges.filter(
+        edge => !removableNodeIds.has(edge.source) && !removableNodeIds.has(edge.target)
+      );
+      const existingEdgeIds = new Set(filteredEdges.map(edge => edge.id));
+      const uniqueNewEdges = newEdges.filter(edge => !existingEdgeIds.has(edge.id));
+      return [...filteredEdges, ...uniqueNewEdges];
+    });
+
+    setSelectedMethodIndex(methodIndex);
+    setShowAllOptions(false);
+    setIsEditMode(false);
+  };
+
 // Listen for create method event from chatbot
 useEffect(() => {
   const handleCreateMethodFromChatbot = (event) => {
@@ -562,13 +677,29 @@ useEffect(() => {
     const handleShowAllMethods = (event) => {
       setShowAllOptions(true);
     };
+
+    const handlePreviewMethod = (event) => {
+      const nextMethodIndex = event.detail?.index;
+      if (typeof nextMethodIndex !== 'number') {
+        return;
+      }
+      replacePreviewMethod(nextMethodIndex);
+    };
+
+    const handleAddMethodFromChatbot = () => {
+      handleAddMethod();
+    };
     
     window.addEventListener('chatbot_decomposition_action', handleChatbotAction);
     window.addEventListener('chatbot_show_all_methods', handleShowAllMethods);
+    window.addEventListener('chatbot_preview_method', handlePreviewMethod);
+    window.addEventListener('chatbot_add_method', handleAddMethodFromChatbot);
     
     return () => {
       window.removeEventListener('chatbot_decomposition_action', handleChatbotAction);
       window.removeEventListener('chatbot_show_all_methods', handleShowAllMethods);
+      window.removeEventListener('chatbot_preview_method', handlePreviewMethod);
+      window.removeEventListener('chatbot_add_method', handleAddMethodFromChatbot);
     };
   }, [nodes, data, edges]);
   
