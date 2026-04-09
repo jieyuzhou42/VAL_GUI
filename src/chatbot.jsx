@@ -920,6 +920,9 @@ Is it correct?`;
   function correctGrounding(data) {
     const dialog = document.createElement('div');
     dialog.className = 'chatbot-container val-output';
+    const currentObjects = Array.isArray(data['current_objects']) ? data['current_objects'] : [];
+    const availableActions = Array.isArray(data['available_actions']) ? data['available_actions'] : [];
+    const availableObjects = Array.isArray(data['available_objects']) ? data['available_objects'] : [];
 
     const form = document.createElement('form');
     form.className = 'grounding-correction-form';
@@ -949,9 +952,8 @@ Is it correct?`;
     currentActionOption.selected = true;
     actionSelect.appendChild(currentActionOption);
 
-    // Add other common actions
-    const commonActions = ['pick', 'place', 'cook', 'cut', 'pour', 'mix', 'serve', 'open', 'close'];
-    commonActions.forEach(action => {
+    // Add other available actions from the backend
+    availableActions.forEach(action => {
       if (action !== data['current_action']) {
         const option = document.createElement('option');
         option.value = action;
@@ -962,10 +964,27 @@ Is it correct?`;
 
     // Create objects selection
     const objectsLabel = document.createElement('label');
-    objectsLabel.textContent = 'Objects (select multiple):';
+    objectsLabel.textContent = 'Objects (optional, select multiple):';
     objectsLabel.style.display = 'block';
     objectsLabel.style.marginBottom = '5px';
     objectsLabel.style.fontWeight = 'bold';
+
+    const noObjectWrapper = document.createElement('label');
+    noObjectWrapper.style.display = 'flex';
+    noObjectWrapper.style.alignItems = 'center';
+    noObjectWrapper.style.gap = '8px';
+    noObjectWrapper.style.marginBottom = '10px';
+
+    const noObjectCheckbox = document.createElement('input');
+    noObjectCheckbox.type = 'checkbox';
+    noObjectCheckbox.name = 'no-object-checkbox';
+    noObjectCheckbox.checked = currentObjects.length === 0;
+
+    const noObjectText = document.createElement('span');
+    noObjectText.textContent = 'None / No object';
+
+    noObjectWrapper.appendChild(noObjectCheckbox);
+    noObjectWrapper.appendChild(noObjectText);
 
     const objectsSelect = document.createElement('select');
     objectsSelect.name = 'objects-select';
@@ -976,19 +995,38 @@ Is it correct?`;
     objectsSelect.style.border = '1px solid #ccc';
     objectsSelect.style.borderRadius = '4px';
     objectsSelect.style.height = '120px';
+    objectsSelect.disabled = noObjectCheckbox.checked;
 
     // Add available objects
-    data['available_objects'].forEach((obj, index) => {
+    availableObjects.forEach((obj, index) => {
       const option = document.createElement('option');
       option.value = obj;
       option.textContent = obj;
       
       // Pre-select current objects
-      if (data['current_objects'].includes(obj)) {
+      if (currentObjects.includes(obj)) {
         option.selected = true;
       }
       
       objectsSelect.appendChild(option);
+    });
+
+    noObjectCheckbox.addEventListener('change', () => {
+      const useNoObject = noObjectCheckbox.checked;
+      objectsSelect.disabled = useNoObject;
+      if (useNoObject) {
+        Array.from(objectsSelect.options).forEach((option) => {
+          option.selected = false;
+        });
+      }
+    });
+
+    objectsSelect.addEventListener('change', () => {
+      const hasSelectedObject = Array.from(objectsSelect.selectedOptions).length > 0;
+      if (hasSelectedObject && noObjectCheckbox.checked) {
+        noObjectCheckbox.checked = false;
+        objectsSelect.disabled = false;
+      }
     });
 
     // Create submit button
@@ -1005,7 +1043,9 @@ Is it correct?`;
     
     submitButton.onclick = () => {
       const selectedAction = actionSelect.value;
-      const selectedObjects = Array.from(objectsSelect.selectedOptions).map(option => option.value);
+      const selectedObjects = noObjectCheckbox.checked
+        ? []
+        : Array.from(objectsSelect.selectedOptions).map(option => option.value);
       
       // Format response as "action:object1,object2"
       const response = `${selectedAction}:${selectedObjects.join(',')}`;
@@ -1016,13 +1056,15 @@ Is it correct?`;
       });
       
       // Show user's selection in chat
-      appendMessage("Me", userPic, "right", `Corrected to: ${selectedAction} -> ${selectedObjects.join(', ')}`);
+      const objectSummary = selectedObjects.length > 0 ? selectedObjects.join(', ') : 'no object';
+      appendMessage("Me", userPic, "right", `Corrected to: ${selectedAction} -> ${objectSummary}`);
     };
 
     // Assemble form
     form.appendChild(actionLabel);
     form.appendChild(actionSelect);
     form.appendChild(objectsLabel);
+    form.appendChild(noObjectWrapper);
     form.appendChild(objectsSelect);
     form.appendChild(submitButton);
     dialog.appendChild(form);

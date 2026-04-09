@@ -1119,11 +1119,138 @@ useEffect(() => {
       }
     }
 
+    const currentDirectTaskNodeIdsForApprove = currentEdges
+      .filter(edge => edge.source === parentNode?.id)
+      .map(edge => edge.target)
+      .filter((targetId, targetIndex, targetIds) => {
+        if (targetIds.indexOf(targetId) !== targetIndex || isControlNodeId(targetId)) {
+          return false;
+        }
+
+        const targetNode = nodesRef.current.find(node => node.id === targetId);
+        return isTaskContentNode(targetNode);
+      });
+
+    const approvedTasksForIndex = data.subtasks?.[index] || [];
+    const approvedTaskIdsForIndex = approvedTasksForIndex.map(task => task.hash);
+    const staleTaskNodeIdsForApprove = currentDirectTaskNodeIdsForApprove.filter(
+      taskId => !approvedTaskIdsForIndex.includes(taskId)
+    );
+    const nodesToRemoveForApprove = collectShiftNodeIds(
+      staleTaskNodeIdsForApprove,
+      currentEdges,
+      nodesRef.current
+    );
+    const childColumnXForApprove = getNextColumnX(parentNode.position.x);
+
+    socket.emit("message", {
+      type: 'response_decomposition_with_edit',
+      response: { user_choice: 'approve', index: index }
+    });
+
+    const approvedTaskNodeMapForIndex = new Map(
+      approvedTasksForIndex.map((task, subIndex) => [
+        task.hash,
+        {
+          id: task.hash,
+          position: {
+            x: childColumnXForApprove,
+            y: getChildY(parentNode.position.y, subIndex, approvedTasksForIndex.length)
+          },
+          data: {
+            label: `${task.task_name} ${task.args}`,
+            task_name: task.task_name,
+            args: task.args,
+            hash: task.hash
+          },
+          _style: getTaskNodeStyle(currentNodeColor),
+          get style() {
+            return this._style;
+          },
+          set style(value) {
+            this._style = value;
+          },
+          sourcePosition: 'right',
+          targetPosition: 'left',
+        }
+      ])
+    );
+
+    setNodes(prevNodes => {
+      const nextNodes = [];
+      const seenNodeIds = new Set();
+
+      prevNodes.forEach(node => {
+        if (node.id === 'chatbot-node' || nodesToRemoveForApprove.has(node.id)) {
+          return;
+        }
+
+        if (node.id.endsWith('-edit')) {
+          const taskId = node.id.replace('-edit', '');
+          if (
+            currentDirectTaskNodeIdsForApprove.includes(taskId) ||
+            approvedTaskIdsForIndex.includes(taskId)
+          ) {
+            return;
+          }
+        }
+
+        if (approvedTaskNodeMapForIndex.has(node.id)) {
+          const approvedNode = approvedTaskNodeMapForIndex.get(node.id);
+          nextNodes.push({
+            ...node,
+            position: approvedNode.position,
+            data: approvedNode.data,
+            style: getTaskNodeStyle(currentNodeColor),
+            hidden: false,
+          });
+          seenNodeIds.add(node.id);
+          return;
+        }
+
+        nextNodes.push(node);
+        seenNodeIds.add(node.id);
+      });
+
+      approvedTaskNodeMapForIndex.forEach((approvedNode, taskId) => {
+        if (!seenNodeIds.has(taskId)) {
+          nextNodes.push(approvedNode);
+        }
+      });
+
+      return nextNodes;
+    });
+
+    setEdges(prevEdges => {
+      const filteredEdges = prevEdges.filter(edge => {
+        const isChatbotEdge =
+          edge.source === 'chatbot-node' ||
+          edge.target === 'chatbot-node';
+        const isCurrentDirectEdge =
+          currentDirectTaskNodeIdsForApprove.includes(edge.target) &&
+          edge.source === parentNode.id;
+        const isRemovedPreviewSubtree =
+          nodesToRemoveForApprove.has(edge.source) || nodesToRemoveForApprove.has(edge.target);
+
+        return !isChatbotEdge && !isCurrentDirectEdge && !isRemovedPreviewSubtree;
+      });
+
+      const existingEdgeIds = new Set(filteredEdges.map(edge => edge.id));
+      const approvedEdges = approvedTaskIdsForIndex
+        .map(targetId => createTreeEdge(parentNode.id, targetId))
+        .filter(edge => !existingEdgeIds.has(edge.id));
+
+      return [...filteredEdges, ...approvedEdges];
+    });
+
+    onConfirm();
+    return;
+
     // Original logic for no edits
     
     // CRITICAL: Extract directTaskNodeIds BEFORE modifying edges
     // The edges are now chatbot → subtasks (not yesNode → subtasks)
-    const directTaskNodeIds = currentEdges
+    const currentDirectTaskNodeIds = currentEdges
       .filter(edge => edge.source === parentNode?.id)
       .map(edge => edge.target)
       .filter((targetId, index, targetIds) => {
@@ -1134,6 +1261,17 @@ useEffect(() => {
         const targetNode = nodesRef.current.find(node => node.id === targetId);
         return isTaskContentNode(targetNode);
       });
+    const approvedTasks = data.subtasks?.[index] || [];
+    const approvedTaskIds = approvedTasks.map(task => task.hash);
+    const directTaskNodeIds = approvedTaskIds.length > 0 ? approvedTaskIds : currentDirectTaskNodeIds;
+    const nodesToRemove = new Set(
+      currentDirectTaskNodeIds.filter(taskId => !directTaskNodeIds.includes(taskId))
+    );
+    if (nodesToRemove.size > 0) {
+      collectShiftNodeIds([...nodesToRemove], currentEdges, nodesRef.current).forEach(id => {
+        nodesToRemove.add(id);
+      });
+    }
     const shiftedSubtreeNodeIds = collectShiftNodeIds(
       directTaskNodeIds,
       currentEdges,
@@ -1146,6 +1284,31 @@ useEffect(() => {
     const offsetY = index > 0
       ? (index - 1) * (LAYOUT_CONSTANTS.SUBTASK_VERTICAL_SPACING + LAYOUT_CONSTANTS.SIBLING_CLEARANCE_Y)
       : 0;
+    const childColumnX = getNextColumnX(parentNode.position.x);
+    const approvedNodesToAdd = approvedTasks
+      .filter(task => !nodesRef.current.some(node => node.id === task.hash))
+      .map((task, subIndex) => ({
+        id: task.hash,
+        position: {
+          x: childColumnX,
+          y: getChildY(parentNode.position.y, subIndex, approvedTasks.length)
+        },
+        data: {
+          label: `${task.task_name} ${task.args}`,
+          task_name: task.task_name,
+          args: task.args,
+          hash: task.hash
+        },
+        _style: getTaskNodeStyle(currentNodeColor),
+        get style() {
+          return this._style;
+        },
+        set style(value) {
+          this._style = value;
+        },
+        sourcePosition: 'right',
+        targetPosition: 'left',
+      }));
 
     // Remove transient chatbot edges and any stale current-tree edges
     setEdges(prevEdges => {
@@ -1154,17 +1317,19 @@ useEffect(() => {
           edge.source === 'chatbot-node' ||
           edge.target === 'chatbot-node';
         const isOldCurrentTreeEdge =
-          directTaskNodeIds.includes(edge.target) &&
+          currentDirectTaskNodeIds.includes(edge.target) &&
           edge.source === parentNode.id;
+        const isRemovedPreviewSubtree =
+          nodesToRemove.has(edge.source) || nodesToRemove.has(edge.target);
 
-        return !isChatbotEdge && !isOldCurrentTreeEdge;
+        return !isChatbotEdge && !isOldCurrentTreeEdge && !isRemovedPreviewSubtree;
       });
       return filtered;
     });
   
     setNodes(prevNodes =>
       prevNodes
-        .filter(node => node.id !== 'chatbot-node')
+        .filter(node => node.id !== 'chatbot-node' && !nodesToRemove.has(node.id))
         .map(node => {
           if (shiftedSubtreeNodeIds.has(node.id)) {
             return {
@@ -1181,10 +1346,11 @@ useEffect(() => {
         .filter(node => {
           if (node.id.endsWith('-edit')) {
             const taskId = node.id.replace('-edit', '');
-            return !directTaskNodeIds.includes(taskId);
+            return !currentDirectTaskNodeIds.includes(taskId) && !nodesToRemove.has(node.id);
           }
           return true;
         })
+        .concat(approvedNodesToAdd)
     );
     
     if (parentNode && directTaskNodeIds.length > 0) {
