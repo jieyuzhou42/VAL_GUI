@@ -21,6 +21,21 @@ const POSITION_CONSTANTS = {
 const findTaskNodeByHash = (nodes, taskHash) => nodes.find(node => node.id === taskHash);
 const removeChatbotEdges = (edges) =>
   edges.filter(edge => edge.source !== 'chatbot-node' && edge.target !== 'chatbot-node');
+const getChatbotAnchorHash = (message) => {
+  if (!message) {
+    return null;
+  }
+
+  if (message.type === 'ask_subtasks') {
+    return message.task_hash || message.text?.task_hash || null;
+  }
+
+  if (message.type === 'confirm_best_match_decomposition') {
+    return message.text?.head?.hash || null;
+  }
+
+  return null;
+};
 
 function App () {
   const [message, setMessage] = useState(null);
@@ -35,9 +50,9 @@ function App () {
   useEffect(() => {
     nodesRef.current = nodes;
 
-    if (message?.type === 'confirm_best_match_decomposition' && message?.text?.head?.hash) {
-      const headHash = message.text.head.hash;
-      const targetNode = findTaskNodeByHash(nodesRef.current, headHash);
+    const anchorHash = getChatbotAnchorHash(message);
+    if (anchorHash) {
+      const targetNode = findTaskNodeByHash(nodesRef.current, anchorHash);
 
       if (targetNode) {
         const nextPosition = {
@@ -63,10 +78,7 @@ function App () {
   }, []);
 
   useEffect(() => {
-    const nextHeadHash =
-      showChatbot && message?.type === 'confirm_best_match_decomposition'
-        ? message?.text?.head?.hash
-        : null;
+    const nextHeadHash = showChatbot ? getChatbotAnchorHash(message) : null;
 
     setNodes(prevNodes => {
       let changed = false;
