@@ -155,6 +155,22 @@ function Chatbot({ socket, message }) {
       .replace(/\n/g, '<br>');
   }
 
+  function formatCollapsedThinkingPrompt(thinkingText) {
+    const detailText = (thinkingText || '').trim();
+
+    if (!detailText) {
+      return '<div class="decomposition-prompt-text">The task expands into the subtasks on the right→.</div>';
+    }
+
+    return `
+      <div class="decomposition-prompt-text">The task expands into the subtasks on the right→.</div>
+      <details class="thinking-collapse">
+        <summary>Thinking</summary>
+        <div class="thinking-collapse-content">${formatAnalysisTextSimple(detailText)}</div>
+      </details>
+    `;
+  }
+
   function mountDecompositionChoicePrompt({
     taskName,
     initialText,
@@ -169,7 +185,7 @@ function Chatbot({ socket, message }) {
       "VAL",
       valPic,
       "left",
-      formatAnalysisTextSimple(initialText),
+      formatCollapsedThinkingPrompt(initialText),
       buttonsDiv
     );
 
@@ -177,7 +193,7 @@ function Chatbot({ socket, message }) {
 
     const setMessageText = (text) => {
       if (msgTextElement) {
-        msgTextElement.innerHTML = formatAnalysisTextSimple(text);
+        msgTextElement.innerHTML = formatCollapsedThinkingPrompt(text);
       }
     };
 
