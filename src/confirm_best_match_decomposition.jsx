@@ -312,6 +312,50 @@ useEffect(() => {
     setIsEditMode(false);
   };
 
+  const clearCurrentDecompositionPreview = () => {
+    const parentNode = findTaskNodeByHash(nodesRef.current, data.head.hash);
+    const removableNodeIds = new Set();
+
+    if (parentNode) {
+      const previewRootIds = edgesRef.current
+        .filter(edge => edge.source === parentNode.id && edge.target !== 'chatbot-node')
+        .map(edge => edge.target);
+
+      collectShiftNodeIds(
+        previewRootIds,
+        edgesRef.current,
+        nodesRef.current
+      ).forEach(id => removableNodeIds.add(id));
+    }
+
+    nodesRef.current.forEach(node => {
+      if (
+        node.id === 'create-new-method' ||
+        node.id === 'noNode' ||
+        node.id === 'add method' ||
+        node.id === 'reject' ||
+        node.id.startsWith(`${data.head.hash}-select-`) ||
+        node.id.startsWith(`${data.head.hash}-new-`) ||
+        node.id.startsWith(`${data.head.hash}-unhide-`)
+      ) {
+        removableNodeIds.add(node.id);
+      }
+    });
+
+    if (removableNodeIds.size === 0) {
+      return;
+    }
+
+    setNodes(prevNodes => prevNodes.filter(node => !removableNodeIds.has(node.id)));
+    setEdges(prevEdges => prevEdges.filter(
+      edge => !removableNodeIds.has(edge.source) && !removableNodeIds.has(edge.target)
+    ));
+
+    setShowAllOptions(false);
+    setIsEditMode(false);
+    setSelectedMethodIndex(-1);
+  };
+
 // Listen for create method event from chatbot
 useEffect(() => {
   const handleCreateMethodFromChatbot = (event) => {
@@ -1546,7 +1590,8 @@ useEffect(() => {
     };
 
   const handleAddMethod = () => {
-  
+    clearCurrentDecompositionPreview();
+
     socket.emit("message", {type: 'response_decomposition_with_edit', 
                            response: {user_choice: 'add_method'}});
     onConfirm(null);
