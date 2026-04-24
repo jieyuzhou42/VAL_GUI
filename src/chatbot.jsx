@@ -114,10 +114,6 @@ function Chatbot({ socket, message }) {
       lastMsgBubble.appendChild(options);
     }
 
-    if (socket) {
-      socket.emit('on log', msgHTML);
-    }
-
     return { lastMsgBubble, msgTextElement };
   }
 
