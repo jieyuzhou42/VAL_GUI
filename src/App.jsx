@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
+import { MarkerType } from '@xyflow/react';
 import RequestUserTask from './requestUserTask';
 import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
 import Display from './Display';
 import DisplayAddedMethod from './DisplayAddedMethod';
+import { isTaskNode } from './plannerUtils';
 import './App.css';
 
 const socket = io('http://localhost:4002', {
@@ -21,6 +23,31 @@ const POSITION_CONSTANTS = {
 const findTaskNodeByHash = (nodes, taskHash) => nodes.find(node => node.id === taskHash);
 const removeChatbotEdges = (edges) =>
   edges.filter(edge => edge.source !== 'chatbot-node' && edge.target !== 'chatbot-node');
+const findLastTaskNodeHash = (nodes = [], edges = []) => {
+  const taskNodes = nodes.filter(isTaskNode);
+  const taskNodeIds = new Set(taskNodes.map(node => node.id));
+  const parentIds = new Set(
+    edges
+      .filter(edge => !edge.hidden && taskNodeIds.has(edge.source) && taskNodeIds.has(edge.target))
+      .map(edge => edge.source)
+  );
+  const leafNodes = taskNodes.filter(node => !parentIds.has(node.id));
+  const candidates = leafNodes.length > 0 ? leafNodes : taskNodes;
+
+  return [...candidates].sort((left, right) => {
+    const leftX = left.position?.x ?? 0;
+    const rightX = right.position?.x ?? 0;
+    const leftY = left.position?.y ?? 0;
+    const rightY = right.position?.y ?? 0;
+
+    if (leftX === rightX) {
+      return rightY - leftY;
+    }
+
+    return rightX - leftX;
+  })[0]?.id ?? null;
+};
+
 const getChatbotAnchorHash = (message) => {
   if (!message) {
     return null;
@@ -34,6 +61,10 @@ const getChatbotAnchorHash = (message) => {
     return message.text?.head?.hash || null;
   }
 
+  if (message.type === 'task_completed') {
+    return message.task_hash || message.text?.task_hash || null;
+  }
+
   return null;
 };
 
@@ -44,11 +75,13 @@ function App () {
   const [edges, setEdges] = useState([]);
   const [chatbotPosition, setChatbotPosition] = useState({ x: 50, y: 50 });
   const nodesRef = useRef([]);
+  const edgesRef = useRef([]);
   const shiftedHeadHashRef = useRef(null);
   const shiftedNodeOriginalXRef = useRef(new Map());
 
   useEffect(() => {
     nodesRef.current = nodes;
+    edgesRef.current = edges;
 
     const anchorHash = getChatbotAnchorHash(message);
     if (anchorHash) {
@@ -65,10 +98,18 @@ function App () {
         );
       }
     }
-  }, [message, nodes]);
+  }, [message, nodes, edges]);
 
   useEffect(() => {
     socket.on('message', (data) => {
+      if (data?.type === 'task_completed' && !data.task_hash && !data.text?.task_hash) {
+        setMessage({
+          ...data,
+          task_hash: findLastTaskNodeHash(nodesRef.current, edgesRef.current),
+        });
+        return;
+      }
+
       setMessage(data);
     });
 
@@ -170,7 +211,8 @@ function App () {
       'display_method_creation',
       'display_edit_options',
       'ask_rephrase',
-      'display_known_tasks'
+      'display_known_tasks',
+      'task_completed'
     ];
 
     if (showChatbotTypes.includes(messageType)) {
@@ -190,7 +232,33 @@ function App () {
 
   useEffect(() => {
     if (showChatbot) {
-      setEdges(prev => removeChatbotEdges(prev));
+      const anchorHash = getChatbotAnchorHash(message);
+
+      setEdges(prev => {
+        const withoutChatbotEdges = removeChatbotEdges(prev);
+
+        if (message?.type !== 'task_completed' || !anchorHash) {
+          return withoutChatbotEdges;
+        }
+
+        return [
+          ...withoutChatbotEdges,
+          {
+            id: `e-${anchorHash}-chatbot-task-completed`,
+            source: anchorHash,
+            target: 'chatbot-node',
+            markerEnd: {
+              type: MarkerType.Arrow,
+              strokeWidth: 2,
+              color: 'rgb(132, 171, 249)',
+            },
+            style: {
+              strokeWidth: 2,
+              stroke: 'rgb(132, 171, 249)',
+            },
+          },
+        ];
+      });
 
       setNodes(prevNodes => {
         const otherNodes = prevNodes.filter(node => node.id !== 'chatbot-node');
