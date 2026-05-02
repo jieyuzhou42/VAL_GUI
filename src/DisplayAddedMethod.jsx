@@ -56,6 +56,15 @@ const getChildY = (parentY, index, total, spacing = LAYOUT_CONSTANTS.SUBTASK_VER
 
 const getNextColumnX = (parentX) => parentX + LAYOUT_CONSTANTS.LEVEL_GAP_X;
 const findTaskNodeByHash = (nodes, taskHash) => nodes.find(node => node.id === taskHash);
+const isControlNodeId = (nodeId = '') =>
+  nodeId === 'chatbot-node' ||
+  nodeId === 'create-new-method' ||
+  nodeId.endsWith('-edit') ||
+  nodeId.endsWith('-trash') ||
+  nodeId.endsWith('-add') ||
+  nodeId.endsWith('-confirm') ||
+  nodeId.includes('-unhide-');
+const isTaskContentNode = (node) => !!node && !isControlNodeId(node.id) && typeof node.data?.task_name === 'string';
 
 const findDescendantIds = (startIds, edges) => {
   const descendants = new Set();
@@ -154,6 +163,15 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       const newNodes = [];
       const newEdges = [];
       const childColumnX = getNextColumnX(parentNode.position.x);
+      const existingRootIds = edges
+        .filter(edge => edge.source === parentNode.id)
+        .map(edge => edge.target)
+        .filter(targetId => {
+          const targetNode = nodes.find(node => node.id === targetId);
+          return isTaskContentNode(targetNode);
+        });
+      const nodesToReplace = collectShiftNodeIds(existingRootIds, edges, nodes);
+      const replacingExistingTree = existingRootIds.length > 0;
       const siblingShift = getSiblingShiftGroups(
         parentNode,
         edges,
@@ -161,15 +179,10 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
         data.subtasks[0]?.length || 0
       );
       
-      // Check which subtasks already exist (created by handleConfirm)
-      const existingNodeIds = new Set(nodes.map(n => n.id));
-  
-      // Create child nodes for each subtask (only if they don't already exist)
+      // Create child nodes for each subtask. Existing direct children are replaced
+      // first because edited methods receive new backend hashes.
       data.subtasks[0].forEach((task, subIndex) => {
         const taskNodeId = task.hash;
-        if (existingNodeIds.has(taskNodeId)) {
-          return; // Skip creating this node
-        }
         
         const taskNode = {
           id: taskNodeId,
@@ -214,11 +227,12 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       });
       
   
-    // Only add nodes that don't already exist
-    if (newNodes.length > 0) {
+    if (newNodes.length > 0 || nodesToReplace.size > 0) {
       setNodes(prev => {
-        const shiftedPrev = prev.map(node => {
-          if (siblingShift.upwardIds.has(node.id)) {
+        const shiftedPrev = prev
+          .filter(node => !nodesToReplace.has(node.id))
+          .map(node => {
+          if (!replacingExistingTree && siblingShift.upwardIds.has(node.id)) {
             return {
               ...node,
               position: {
@@ -228,7 +242,7 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
             };
           }
 
-          if (siblingShift.downwardIds.has(node.id)) {
+          if (!replacingExistingTree && siblingShift.downwardIds.has(node.id)) {
             return {
               ...node,
               position: {
@@ -245,11 +259,13 @@ function DisplayAddedMethod({ data, socket, onConfirm, nodes, edges, setNodes, s
       });
     }
     
-    // Filter out duplicate edges before adding
     setEdges(prev => {
-      const existingEdgeIds = new Set(prev.map(e => e.id));
+      const filteredEdges = prev.filter(
+        edge => !nodesToReplace.has(edge.source) && !nodesToReplace.has(edge.target)
+      );
+      const existingEdgeIds = new Set(filteredEdges.map(e => e.id));
       const uniqueNewEdges = newEdges.filter(e => !existingEdgeIds.has(e.id));
-      return [...prev, ...uniqueNewEdges];
+      return [...filteredEdges, ...uniqueNewEdges];
     });
     
     // NOTE: Parent → placeholder edge is already created by handleConfirm replacement logic
