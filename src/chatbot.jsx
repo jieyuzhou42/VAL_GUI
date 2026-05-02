@@ -75,8 +75,8 @@ function Chatbot({ socket, message }) {
       else if (message['type'] === 'display_thinking_analysis') {
         displayThinkingAnalysis(message);
       }
-      else if (message['type'] === 'show_thinking_analysis_and_decomposition') {
-        showThinkingAnalysisAndDecomposition(message);
+      else if (message['type'] === 'confirm_best_match_decomposition') {
+        confirmBestMatchDecomposition(message);
       }
       else if (message['type'] === 'display_decomposition_analysis') {
         displayDecompositionAnalysis(message);
@@ -393,90 +393,16 @@ function Chatbot({ socket, message }) {
     appendMessage("VAL", valPic, "left", formattedText, buttonsDiv);
   }
 
-  function showThinkingAnalysisAndDecomposition(message) {
-    
-    try {
-      const data = message.text;
-      const userTask = data.user_task;
-      const taskName = data.task_name;
-      const taskArgs = data.task_args;
-      const analysisText = data.analysis_text;
-      
-      
-      const promptText = analysisText || 'Is this decomposition correct?';
+  function confirmBestMatchDecomposition(message) {
+    const data = message.text || {};
+    const taskName = data.head?.name || data.task_name || 'this task';
+    const promptText = data.analysis_text || 'Is this decomposition correct?';
 
-      mountDecompositionChoicePrompt({
-        taskName,
-        initialText: promptText,
-        decompositionMethods: data.subtasks || [],
-      });
-      return;
-    
-    // Create approve/reject buttons for grounding confirmation
-    const buttonsDiv = document.createElement('div');
-    buttonsDiv.className = 'chatbot-container buttons';
-    buttonsDiv.style.marginTop = '10px';
-
-    const approveButton = document.createElement('button');
-    approveButton.className = 'yes';
-    approveButton.innerHTML = '✓ Approve';
-    approveButton.style.marginRight = '10px';
-    approveButton.onclick = () => {
-      console.trace('Button click stack trace');
-
-      emitMessage({
-        type: 'response_decomposition_with_edit',
-        response: { user_choice: 'approve', index: 0 },
-      });
-      
-      // Trigger the tree component's handleConfirm via custom event
-      // The tree component will send the socket message
-      const event = new CustomEvent('chatbot_decomposition_action', {
-        detail: { action: 'approve', index: 0 }
-      });
-      window.dispatchEvent(event);
-      
-      // Disable and fade out buttons after clicking
-      approveButton.disabled = true;
-      rejectButton.disabled = true;
-      approveButton.style.opacity = '0.3';
-      rejectButton.style.opacity = '0.3';
-      approveButton.style.cursor = 'not-allowed';
-      rejectButton.style.cursor = 'not-allowed';
-    };
-
-    const rejectButton = document.createElement('button');
-    rejectButton.className = 'no';
-    rejectButton.innerHTML = '× Reject';
-    rejectButton.onclick = () => {
-      // Disable and fade out the approve/reject buttons
-      approveButton.disabled = true;
-      rejectButton.disabled = true;
-      approveButton.style.opacity = '0.3';
-      rejectButton.style.opacity = '0.3';
-      approveButton.style.cursor = 'not-allowed';
-      rejectButton.style.cursor = 'not-allowed';
-      
-      // Trigger showing all method options in the tree
-      const event = new CustomEvent('chatbot_show_all_methods', {
-        detail: { action: 'show_all' }
-      });
-      window.dispatchEvent(event);
-    };
-
-    buttonsDiv.appendChild(approveButton);
-    buttonsDiv.appendChild(rejectButton);
-    
-    
-      // Display the thinking analysis with buttons
-      appendMessage("VAL", valPic, "left", formattedText, buttonsDiv);
-      
-      // Also trigger decomposition tree display (this should be handled by the backend)
-      // For now, we'll emit a message to show the decomposition tree
-    } catch (error) {
-      console.error('Error in showThinkingAnalysisAndDecomposition:', error);
-      console.error('Error stack:', error.stack);
-    }
+    mountDecompositionChoicePrompt({
+      taskName,
+      initialText: promptText,
+      decompositionMethods: data.subtasks || [],
+    });
   }
 
   function displayDecompositionAnalysis(message) {

@@ -203,7 +203,6 @@ function App () {
     const showChatbotTypes = [
       'confirm_best_match_decomposition',
       'display_thinking_analysis',
-      'show_thinking_analysis_and_decomposition',
       'ask_subtasks',
       'segment_confirmation',
       'confirm_task_decomposition',
