@@ -81,9 +81,6 @@ function Chatbot({ socket, message }) {
       else if (message['type'] === 'display_decomposition_analysis') {
         displayDecompositionAnalysis(message);
       }
-      else if (message['type'] === 'task_completed') {
-        taskCompleted(message);
-      }
     }
   }, [message]);
 
@@ -670,26 +667,6 @@ function Chatbot({ socket, message }) {
 
     appendMessage("VAL", valPic, "left", data['text'], buttonsDiv);
   }
-
-  function taskCompleted(data) {
-    const buttonsDiv = document.createElement('div');
-    buttonsDiv.className = 'chatbot-container buttons';
-
-    const finishButton = document.createElement('button');
-    finishButton.className = 'yes';
-    finishButton.textContent = 'Finish Task';
-    finishButton.onclick = () => {
-      emitMessage({ type: 'finish_task_response', response: 'finish' });
-      appendMessage("Me", userPic, "right", 'Finish Task');
-      finishButton.disabled = true;
-      finishButton.style.opacity = '0.3';
-      finishButton.style.cursor = 'not-allowed';
-    };
-
-    buttonsDiv.appendChild(finishButton);
-    appendMessage("VAL", valPic, "left", data['text'] || 'Task completed.', buttonsDiv);
-  }
-
 
   function correctGrounding(data) {
     const dialog = document.createElement('div');

@@ -1,11 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
-import { MarkerType } from '@xyflow/react';
 import RequestUserTask from './requestUserTask';
 import ConfirmBestMatchDecomposition from './confirm_best_match_decomposition';
 import Display from './Display';
 import DisplayAddedMethod from './DisplayAddedMethod';
-import { isTaskNode } from './plannerUtils';
 import './App.css';
 
 const socket = io('http://localhost:4002', {
@@ -23,83 +21,6 @@ const POSITION_CONSTANTS = {
 const findTaskNodeByHash = (nodes, taskHash) => nodes.find(node => node.id === taskHash);
 const removeChatbotEdges = (edges) =>
   edges.filter(edge => edge.source !== 'chatbot-node' && edge.target !== 'chatbot-node');
-const compareExecutionOrderDescending = (left, right) => {
-  const leftY = left.position?.y ?? 0;
-  const rightY = right.position?.y ?? 0;
-  const leftX = left.position?.x ?? 0;
-  const rightX = right.position?.x ?? 0;
-
-  if (leftY === rightY) {
-    return rightX - leftX;
-  }
-
-  return rightY - leftY;
-};
-
-const findLastDecomposedTaskNodeHash = (nodes = [], edges = []) => {
-  const taskNodes = nodes.filter(isTaskNode);
-  const taskNodeIds = new Set(taskNodes.map(node => node.id));
-
-  const decomposedParentIds = new Set();
-
-  edges.forEach(edge => {
-    if (edge.hidden || !taskNodeIds.has(edge.source) || !taskNodeIds.has(edge.target)) {
-      return;
-    }
-
-    decomposedParentIds.add(edge.source);
-  });
-
-  const decomposedNodes = taskNodes.filter(node => decomposedParentIds.has(node.id));
-  const candidates = decomposedNodes.length > 0 ? decomposedNodes : taskNodes;
-
-  return [...candidates].sort(compareExecutionOrderDescending)[0]?.id ?? null;
-};
-
-const findLastLeafTaskNodeHash = (nodes = [], edges = [], rootHash = null) => {
-  const taskNodes = nodes.filter(isTaskNode);
-  const taskNodeMap = new Map(taskNodes.map(node => [node.id, node]));
-  const taskNodeIds = new Set(taskNodeMap.keys());
-
-  if (taskNodes.length === 0) {
-    return null;
-  }
-
-  const childMap = new Map(taskNodes.map(node => [node.id, []]));
-  edges.forEach(edge => {
-    if (edge.hidden || !taskNodeIds.has(edge.source) || !taskNodeIds.has(edge.target)) {
-      return;
-    }
-
-    childMap.get(edge.source).push(edge.target);
-  });
-
-  const candidateIds = new Set();
-  const roots =
-    rootHash && taskNodeMap.has(rootHash)
-      ? [rootHash]
-      : taskNodes.map(node => node.id);
-  const stack = [...roots];
-  const visited = new Set();
-
-  while (stack.length > 0) {
-    const nodeId = stack.pop();
-    if (visited.has(nodeId) || !taskNodeMap.has(nodeId)) {
-      continue;
-    }
-
-    visited.add(nodeId);
-    candidateIds.add(nodeId);
-    childMap.get(nodeId).forEach(childId => stack.push(childId));
-  }
-
-  const candidates = [...candidateIds]
-    .filter(nodeId => (childMap.get(nodeId) || []).length === 0)
-    .map(nodeId => taskNodeMap.get(nodeId))
-    .filter(Boolean);
-
-  return [...candidates].sort(compareExecutionOrderDescending)[0]?.id ?? null;
-};
 
 const getChatbotAnchorHash = (message) => {
   if (!message) {
@@ -114,10 +35,6 @@ const getChatbotAnchorHash = (message) => {
     return message.text?.head?.hash || null;
   }
 
-  if (message.type === 'task_completed') {
-    return message.task_hash || message.text?.task_hash || null;
-  }
-
   return null;
 };
 
@@ -128,14 +45,11 @@ function App () {
   const [edges, setEdges] = useState([]);
   const [chatbotPosition, setChatbotPosition] = useState({ x: 50, y: 50 });
   const nodesRef = useRef([]);
-  const edgesRef = useRef([]);
   const shiftedHeadHashRef = useRef(null);
   const shiftedNodeOriginalXRef = useRef(new Map());
-  const lastDecomposedHeadHashRef = useRef(null);
 
   useEffect(() => {
     nodesRef.current = nodes;
-    edgesRef.current = edges;
 
     const anchorHash = getChatbotAnchorHash(message);
     if (anchorHash) {
@@ -156,24 +70,9 @@ function App () {
 
   useEffect(() => {
     socket.on('message', (data) => {
-      if (data?.type === 'confirm_best_match_decomposition') {
-        lastDecomposedHeadHashRef.current = data.text?.head?.hash || null;
-      }
-
-      if (data?.type === 'task_completed' && !data.task_hash && !data.text?.task_hash) {
-        const lastDecomposedHeadHash = lastDecomposedHeadHashRef.current;
-        const fallbackHash =
-          findLastLeafTaskNodeHash(
-            nodesRef.current,
-            edgesRef.current,
-            lastDecomposedHeadHash
-          ) ||
-          findLastDecomposedTaskNodeHash(nodesRef.current, edgesRef.current);
-
-        setMessage({
-          ...data,
-          task_hash: fallbackHash,
-        });
+      if (data?.type === 'task_completed') {
+        setShowChatbot(false);
+        setMessage(null);
         return;
       }
 
@@ -277,8 +176,7 @@ function App () {
       'display_method_creation',
       'display_edit_options',
       'ask_rephrase',
-      'display_known_tasks',
-      'task_completed'
+      'display_known_tasks'
     ];
 
     if (showChatbotTypes.includes(messageType)) {
@@ -289,7 +187,6 @@ function App () {
       setEdges([]);
       shiftedHeadHashRef.current = null;
       shiftedNodeOriginalXRef.current = new Map();
-      lastDecomposedHeadHashRef.current = null;
     }
   }, [message]);
 
@@ -304,27 +201,7 @@ function App () {
       setEdges(prev => {
         const withoutChatbotEdges = removeChatbotEdges(prev);
 
-        if (message?.type !== 'task_completed' || !anchorHash) {
-          return withoutChatbotEdges;
-        }
-
-        return [
-          ...withoutChatbotEdges,
-          {
-            id: `e-${anchorHash}-chatbot-task-completed`,
-            source: anchorHash,
-            target: 'chatbot-node',
-            markerEnd: {
-              type: MarkerType.Arrow,
-              strokeWidth: 2,
-              color: 'rgb(132, 171, 249)',
-            },
-            style: {
-              strokeWidth: 2,
-              stroke: 'rgb(132, 171, 249)',
-            },
-          },
-        ];
+        return withoutChatbotEdges;
       });
 
       setNodes(prevNodes => {
